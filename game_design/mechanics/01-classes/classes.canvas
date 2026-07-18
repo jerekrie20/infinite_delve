@@ -1,0 +1,20 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# ⚔️ Classes — the journey\n_pick a base → climb one branch → master it → roster_","x":-20,"y":-240,"width":600,"height":80},
+		{"id":"pick","type":"text","text":"Pick a base\nSquire / Archer / Apprentice","x":-20,"y":-100,"width":230,"height":90,"color":"4"},
+		{"id":"play","type":"text","text":"Delve & level","x":270,"y":-100,"width":170,"height":90},
+		{"id":"ritual","type":"text","text":"Advancement ritual\nlevel → items → key → temple → boss\n([[advancement]])","x":500,"y":-100,"width":260,"height":120},
+		{"id":"branch","type":"text","text":"◆ Branch & commit\n(locked unless it re-branches)","x":820,"y":-100,"width":230,"height":90},
+		{"id":"cap","type":"text","text":"Reach a capstone → Master it","x":1110,"y":-100,"width":230,"height":90},
+		{"id":"roster","type":"text","text":"🏆 Roster\nprestige badge + unlock as a new base pick","x":1400,"y":-100,"width":250,"height":90,"color":"4"},
+		{"id":"respec","type":"text","text":"🔁 1 free respec · then a rare item = step back one node","x":500,"y":60,"width":550,"height":70,"color":"6"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"pick","fromSide":"right","toNode":"play","toSide":"left"},
+		{"id":"e2","fromNode":"play","fromSide":"right","toNode":"ritual","toSide":"left"},
+		{"id":"e3","fromNode":"ritual","fromSide":"right","toNode":"branch","toSide":"left"},
+		{"id":"e4","fromNode":"branch","fromSide":"bottom","toNode":"play","toSide":"bottom","label":"next tier"},
+		{"id":"e5","fromNode":"branch","fromSide":"right","toNode":"cap","toSide":"left"},
+		{"id":"e6","fromNode":"cap","fromSide":"right","toNode":"roster","toSide":"left"}
+	]
+}

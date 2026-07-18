@@ -1,0 +1,17 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 👽 Reddit-native — how it works","x":-20,"y":-230,"width":520,"height":60},
+		{"id":"post","type":"text","text":"The game post\nfrontier + Delve button","x":-20,"y":-60,"width":230,"height":90},
+		{"id":"report","type":"text","text":"Daily report (always)\nprogress · top delvers · boss","x":300,"y":-190,"width":270,"height":90},
+		{"id":"daily","type":"text","text":"Daily Delve\nleaderboard + \"today's Daily\" thread","x":300,"y":-60,"width":270,"height":90,"color":"2"},
+		{"id":"events","type":"text","text":"Event posts:\nboss felled · hidden class · finale","x":300,"y":70,"width":270,"height":90},
+		{"id":"comments","type":"text","text":"Comments = war room\ncoordination · theorycraft · brag","x":640,"y":-60,"width":260,"height":90},
+		{"id":"note","type":"text","text":"Devvit has no push → the \"pull\" lives in these feed surfaces. Cross-sub rivalry = not v1.","x":300,"y":200,"width":600,"height":70,"color":"6"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"post","fromSide":"right","toNode":"report","toSide":"left"},
+		{"id":"e2","fromNode":"post","fromSide":"right","toNode":"daily","toSide":"left"},
+		{"id":"e3","fromNode":"post","fromSide":"right","toNode":"events","toSide":"left"},
+		{"id":"e4","fromNode":"daily","fromSide":"right","toNode":"comments","toSide":"left"}
+	]
+}

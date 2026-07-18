@@ -1,0 +1,18 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 🗺️ Delve Generation — how it works","x":-20,"y":-230,"width":520,"height":60},
+		{"id":"personal","type":"text","text":"Personal delve\nrandom seed · endless · repeatable","x":-20,"y":-120,"width":270,"height":90,"color":"4"},
+		{"id":"daily","type":"text","text":"The Daily Delve\nshared seed · 1 attempt · leaderboard","x":-20,"y":10,"width":270,"height":90,"color":"2"},
+		{"id":"gen","type":"text","text":"Generate\nfog map · biome + depth","x":320,"y":-55,"width":220,"height":90},
+		{"id":"pop","type":"text","text":"Populate\nmonsters · chests · temple?","x":600,"y":-55,"width":230,"height":90},
+		{"id":"run","type":"text","text":"Descend deeper →\nextract when you dare (endless)","x":890,"y":-55,"width":250,"height":90},
+		{"id":"feed","type":"text","text":"→ hero + [[frontier]]","x":1200,"y":-55,"width":200,"height":90}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"personal","fromSide":"right","toNode":"gen","toSide":"left"},
+		{"id":"e2","fromNode":"daily","fromSide":"right","toNode":"gen","toSide":"left"},
+		{"id":"e3","fromNode":"gen","fromSide":"right","toNode":"pop","toSide":"left"},
+		{"id":"e4","fromNode":"pop","fromSide":"right","toNode":"run","toSide":"left"},
+		{"id":"e5","fromNode":"run","fromSide":"right","toNode":"feed","toSide":"left"}
+	]
+}

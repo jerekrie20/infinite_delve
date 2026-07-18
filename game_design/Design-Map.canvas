@@ -1,0 +1,32 @@
+{
+	"nodes":[
+		{"id":"core-run","type":"file","file":"mechanics/00-core-run/core-run.md","x":-40,"y":0,"width":300,"height":150,"color":"4"},
+		{"id":"turn-model","type":"file","file":"mechanics/00-core-run/turn-model.md","x":-40,"y":220,"width":300,"height":130,"color":"4"},
+		{"id":"classes","type":"file","file":"mechanics/01-classes/classes.md","x":420,"y":-210,"width":300,"height":150,"color":"4"},
+		{"id":"advancement","type":"file","file":"mechanics/01-classes/advancement.md","x":420,"y":0,"width":300,"height":130,"color":"4"},
+		{"id":"monsters","type":"file","file":"mechanics/02-monsters/monsters.md","x":420,"y":260,"width":300,"height":150,"color":"3"},
+		{"id":"combat","type":"file","file":"mechanics/03-combat/combat.md","x":880,"y":20,"width":300,"height":150,"color":"2"},
+		{"id":"loot-gear","type":"file","file":"mechanics/04-loot-gear/loot-gear.md","x":1340,"y":-140,"width":300,"height":150},
+		{"id":"delve-generation","type":"file","file":"mechanics/05-delve-generation/delve-generation.md","x":1340,"y":140,"width":300,"height":150},
+		{"id":"frontier","type":"file","file":"mechanics/06-frontier/frontier.md","x":1800,"y":10,"width":300,"height":150},
+		{"id":"economy","type":"file","file":"mechanics/07-economy-monetization/economy.md","x":2260,"y":-200,"width":300,"height":150},
+		{"id":"onboarding","type":"file","file":"mechanics/08-onboarding/onboarding.md","x":2260,"y":20,"width":300,"height":150},
+		{"id":"reddit-native","type":"file","file":"mechanics/09-reddit-native/reddit-native.md","x":2260,"y":240,"width":300,"height":150},
+		{"id":"title","type":"text","text":"# 🗺️ DELVE — design map\n_foundation → wrappers · click any card to open the note · colours = status_","x":-40,"y":-360,"width":640,"height":90}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"core-run","fromSide":"right","toNode":"classes","toSide":"left"},
+		{"id":"e2","fromNode":"core-run","fromSide":"right","toNode":"monsters","toSide":"left"},
+		{"id":"e3","fromNode":"core-run","fromSide":"bottom","toNode":"turn-model","toSide":"top"},
+		{"id":"e4","fromNode":"classes","fromSide":"bottom","toNode":"advancement","toSide":"top"},
+		{"id":"e5","fromNode":"classes","fromSide":"right","toNode":"combat","toSide":"left"},
+		{"id":"e6","fromNode":"monsters","fromSide":"right","toNode":"combat","toSide":"left"},
+		{"id":"e7","fromNode":"combat","fromSide":"right","toNode":"loot-gear","toSide":"left"},
+		{"id":"e8","fromNode":"combat","fromSide":"right","toNode":"delve-generation","toSide":"left"},
+		{"id":"e9","fromNode":"combat","fromSide":"right","toNode":"onboarding","toSide":"left"},
+		{"id":"e10","fromNode":"delve-generation","fromSide":"right","toNode":"frontier","toSide":"left"},
+		{"id":"e11","fromNode":"loot-gear","fromSide":"right","toNode":"economy","toSide":"left"},
+		{"id":"e12","fromNode":"frontier","fromSide":"right","toNode":"economy","toSide":"left"},
+		{"id":"e13","fromNode":"frontier","fromSide":"right","toNode":"reddit-native","toSide":"left"}
+	]
+}

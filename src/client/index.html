@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta
+      name="viewport"
+      content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0"
+    />
+    <title>Infinite Delve</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="game"></div>
+      <div id="hud">
+        <div id="hud-top">
+          <button id="btn-daily" class="chip">📊 DAILY</button>
+        </div>
+        <div id="hud-bottom">
+          <button id="btn-extract" class="btn btn-extract">
+            EXTRACT &amp; BANK
+          </button>
+        </div>
+      </div>
+      <div id="daily-panel" class="panel-backdrop">
+        <div class="panel">
+          <button id="daily-close" class="panel-close" aria-label="Close">✕</button>
+          <div id="daily-content"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="main.ts"></script>
+  </body>
+</html>

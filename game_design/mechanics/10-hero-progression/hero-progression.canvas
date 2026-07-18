@@ -1,0 +1,17 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 📈 Hero Progression — how it works","x":-20,"y":-210,"width":540,"height":60},
+		{"id":"delve","type":"text","text":"Delve:\nkills · depth · objectives","x":-20,"y":-50,"width":220,"height":80},
+		{"id":"xp","type":"text","text":"Gain XP\n(rising curve)","x":260,"y":-50,"width":190,"height":80},
+		{"id":"lvl","type":"text","text":"Level up → 100\nstats + ability slots","x":510,"y":-50,"width":230,"height":80,"color":"4"},
+		{"id":"rit","type":"text","text":"Advancement ritual\nat tier gates","x":800,"y":-50,"width":220,"height":80},
+		{"id":"cap","type":"text","text":"Capstone → Master →\nroster + ~1% bonus","x":1080,"y":-50,"width":250,"height":80,"color":"4"},
+		{"id":"flag","type":"text","text":"⚠️ 1% prestige stacks across masteries → cap it / normalize the Daily leaderboard","x":510,"y":90,"width":620,"height":70,"color":"1"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"delve","fromSide":"right","toNode":"xp","toSide":"left"},
+		{"id":"e2","fromNode":"xp","fromSide":"right","toNode":"lvl","toSide":"left"},
+		{"id":"e3","fromNode":"lvl","fromSide":"right","toNode":"rit","toSide":"left"},
+		{"id":"e4","fromNode":"rit","fromSide":"right","toNode":"cap","toSide":"left"}
+	]
+}

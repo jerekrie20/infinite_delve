@@ -1,0 +1,22 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 🧭 Core Run — the delve loop\n_what a single run feels like, second to second_","x":-20,"y":-240,"width":560,"height":80},
+		{"id":"open","type":"text","text":"Open post","x":-20,"y":-100,"width":180,"height":80},
+		{"id":"exp","type":"text","text":"Explore fog\n(free move)","x":220,"y":-100,"width":200,"height":80},
+		{"id":"fight","type":"text","text":"Fight — auto-battle\nstationary → [[combat]]","x":480,"y":-100,"width":220,"height":80,"color":"2"},
+		{"id":"dec","type":"text","text":"◆ Push or bank?","x":760,"y":-100,"width":190,"height":80},
+		{"id":"bank","type":"text","text":"Extract → bank loot + XP","x":1020,"y":-200,"width":230,"height":80,"color":"4"},
+		{"id":"die","type":"text","text":"💀 Die → lose unbanked","x":1020,"y":-20,"width":230,"height":80,"color":"1"},
+		{"id":"feed","type":"text","text":"Feed the [[frontier]]","x":1320,"y":-110,"width":220,"height":80}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"open","fromSide":"right","toNode":"exp","toSide":"left"},
+		{"id":"e2","fromNode":"exp","fromSide":"right","toNode":"fight","toSide":"left"},
+		{"id":"e3","fromNode":"fight","fromSide":"right","toNode":"dec","toSide":"left"},
+		{"id":"e4","fromNode":"dec","fromSide":"bottom","toNode":"exp","toSide":"bottom","label":"push deeper"},
+		{"id":"e5","fromNode":"dec","fromSide":"right","toNode":"bank","toSide":"left","label":"extract"},
+		{"id":"e6","fromNode":"dec","fromSide":"right","toNode":"die","toSide":"left"},
+		{"id":"e7","fromNode":"bank","fromSide":"right","toNode":"feed","toSide":"top"},
+		{"id":"e8","fromNode":"die","fromSide":"right","toNode":"feed","toSide":"bottom"}
+	]
+}

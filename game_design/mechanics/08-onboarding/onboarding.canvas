@@ -1,0 +1,17 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 🚪 Onboarding — how it works","x":-20,"y":-210,"width":500,"height":60},
+		{"id":"open","type":"text","text":"Open the post","x":-20,"y":-50,"width":180,"height":80},
+		{"id":"pick","type":"text","text":"Pick a class\n= instant identity","x":200,"y":-50,"width":220,"height":80,"color":"4"},
+		{"id":"delve","type":"text","text":"Gentle Meadow delve","x":460,"y":-50,"width":210,"height":80},
+		{"id":"guide","type":"text","text":"Guided run 1:\n2 grunts · first loot","x":710,"y":-50,"width":230,"height":80},
+		{"id":"hook","type":"text","text":"Level once · the sub's\nfrontier needs you","x":980,"y":-50,"width":240,"height":80,"color":"4"},
+		{"id":"note","type":"text","text":"No auto-delve — the goal is to turn lurkers into real players","x":200,"y":90,"width":520,"height":60,"color":"6"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"open","fromSide":"right","toNode":"pick","toSide":"left"},
+		{"id":"e2","fromNode":"pick","fromSide":"right","toNode":"delve","toSide":"left"},
+		{"id":"e3","fromNode":"delve","fromSide":"right","toNode":"guide","toSide":"left"},
+		{"id":"e4","fromNode":"guide","fromSide":"right","toNode":"hook","toSide":"left"}
+	]
+}

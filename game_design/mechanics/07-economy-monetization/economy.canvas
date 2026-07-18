@@ -1,0 +1,15 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 💰 Economy — how it works","x":-20,"y":-210,"width":480,"height":60},
+		{"id":"delve","type":"text","text":"Unlimited personal delves","x":-20,"y":-50,"width":230,"height":80,"color":"4"},
+		{"id":"coins","type":"text","text":"Coins: copper → silver →\ngold → diamond","x":270,"y":-50,"width":260,"height":80},
+		{"id":"shop","type":"text","text":"Town shop\ngear · consumables","x":590,"y":-50,"width":220,"height":80},
+		{"id":"daily","type":"text","text":"Daily Delve 1×/day\n= the daily habit","x":-20,"y":90,"width":230,"height":80,"color":"2"},
+		{"id":"mon","type":"text","text":"💎 Money = cosmetics + convenience only (NO power, NO paid delves)","x":270,"y":90,"width":540,"height":80,"color":"6"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"delve","fromSide":"right","toNode":"coins","toSide":"left"},
+		{"id":"e2","fromNode":"coins","fromSide":"right","toNode":"shop","toSide":"left"},
+		{"id":"e3","fromNode":"delve","fromSide":"bottom","toNode":"daily","toSide":"top"}
+	]
+}

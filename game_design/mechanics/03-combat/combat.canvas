@@ -1,0 +1,28 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 🗡️ Combat — how a fight resolves\n_two inputs → the loop → an outcome_","x":-20,"y":-260,"width":640,"height":80},
+		{"id":"pl","type":"text","text":"## 🧙 PLAYER\nclass · gear · mana · HP","x":-20,"y":-80,"width":240,"height":110,"color":"4"},
+		{"id":"mo","type":"text","text":"## 👹 MONSTERS\nstats · signature move","x":-20,"y":90,"width":240,"height":110,"color":"3"},
+		{"id":"eng","type":"text","text":"Engage on a tile\n(terrain bonus applies)","x":300,"y":10,"width":220,"height":90},
+		{"id":"ow","type":"text","text":"Opening window\nranged/mage free hits","x":600,"y":10,"width":220,"height":90},
+		{"id":"tr","type":"text","text":"Auto-attack trade\nboth sides + terrain","x":900,"y":10,"width":220,"height":90},
+		{"id":"ab","type":"text","text":"You time abilities\nspend mana","x":1200,"y":10,"width":220,"height":90},
+		{"id":"out","type":"text","text":"◆ Outcome?","x":1500,"y":10,"width":180,"height":90},
+		{"id":"win","type":"text","text":"✅ Win → loot drops","x":1760,"y":-110,"width":230,"height":80,"color":"4"},
+		{"id":"ret","type":"text","text":"↩ Retreat → back to explore","x":1760,"y":0,"width":230,"height":80},
+		{"id":"die","type":"text","text":"💀 HP 0 → lose unbanked loot","x":1760,"y":110,"width":230,"height":80,"color":"1"},
+		{"id":"q","type":"text","text":"❓ **Open**: damage model (variance / crits)? · ability = cooldown + mana? · opening-window size? · terrain bonus %?","x":600,"y":150,"width":620,"height":110,"color":"6"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"pl","fromSide":"right","toNode":"eng","toSide":"left"},
+		{"id":"e2","fromNode":"mo","fromSide":"right","toNode":"eng","toSide":"left"},
+		{"id":"e3","fromNode":"eng","fromSide":"right","toNode":"ow","toSide":"left"},
+		{"id":"e4","fromNode":"ow","fromSide":"right","toNode":"tr","toSide":"left"},
+		{"id":"e5","fromNode":"tr","fromSide":"right","toNode":"ab","toSide":"left"},
+		{"id":"e6","fromNode":"ab","fromSide":"bottom","toNode":"tr","toSide":"bottom","label":"repeat"},
+		{"id":"e7","fromNode":"ab","fromSide":"right","toNode":"out","toSide":"left"},
+		{"id":"e8","fromNode":"out","fromSide":"right","toNode":"win","toSide":"left"},
+		{"id":"e9","fromNode":"out","fromSide":"right","toNode":"ret","toSide":"left"},
+		{"id":"e10","fromNode":"out","fromSide":"right","toNode":"die","toSide":"left"}
+	]
+}

@@ -1,0 +1,22 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 🎒 Loot & Gear — how it works","x":-20,"y":-240,"width":500,"height":60},
+		{"id":"src","type":"text","text":"Kill · chest · boss","x":-20,"y":-110,"width":200,"height":80},
+		{"id":"drop","type":"text","text":"Drops:\ngear · coins · items","x":240,"y":-110,"width":220,"height":80},
+		{"id":"bag","type":"text","text":"Backpack (35)\nthis run","x":520,"y":-110,"width":200,"height":80},
+		{"id":"x","type":"text","text":"◆ Extract?","x":780,"y":-110,"width":160,"height":80},
+		{"id":"stash","type":"text","text":"Extract → town stash\n(unlimited)","x":1000,"y":-210,"width":240,"height":80,"color":"4"},
+		{"id":"lose","type":"text","text":"💀 Die → unbanked lost","x":1000,"y":-30,"width":240,"height":80,"color":"1"},
+		{"id":"eq","type":"text","text":"Equip · sell · craft","x":1300,"y":-210,"width":220,"height":80},
+		{"id":"n1","type":"text","text":"9 slots: head · body · 2 hands · legs · feet · 2 rings · amulet   ·   5 rarity tiers (Common→Legendary, +affixes)","x":240,"y":40,"width":700,"height":70,"color":"6"},
+		{"id":"n2","type":"text","text":"Equipped gear is ALWAYS safe ✅ — only unbanked run loot is lost","x":520,"y":130,"width":420,"height":60,"color":"4"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"src","fromSide":"right","toNode":"drop","toSide":"left"},
+		{"id":"e2","fromNode":"drop","fromSide":"right","toNode":"bag","toSide":"left"},
+		{"id":"e3","fromNode":"bag","fromSide":"right","toNode":"x","toSide":"left"},
+		{"id":"e4","fromNode":"x","fromSide":"right","toNode":"stash","toSide":"left","label":"extract"},
+		{"id":"e5","fromNode":"x","fromSide":"right","toNode":"lose","toSide":"left","label":"die"},
+		{"id":"e6","fromNode":"stash","fromSide":"right","toNode":"eq","toSide":"left"}
+	]
+}

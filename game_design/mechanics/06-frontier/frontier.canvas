@@ -1,0 +1,18 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 🌍 The Frontier — how it works","x":-20,"y":-230,"width":500,"height":60},
+		{"id":"run","type":"text","text":"Your delve result","x":-20,"y":-50,"width":200,"height":80},
+		{"id":"agg","type":"text","text":"Daily tick\naggregates the sub","x":240,"y":-50,"width":220,"height":80},
+		{"id":"map","type":"text","text":"Frontier fills ·\nbig-boss HP drops","x":520,"y":-50,"width":240,"height":80},
+		{"id":"lead","type":"text","text":"Contributor leaderboard (shown)","x":240,"y":100,"width":240,"height":70,"color":"6"},
+		{"id":"win","type":"text","text":"🏆 Defeat the big boss\n= season win (4 wks)","x":820,"y":-150,"width":250,"height":80,"color":"4"},
+		{"id":"fail","type":"text","text":"Fail in time →\nnext boss stronger, no drops","x":820,"y":30,"width":250,"height":80,"color":"1"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"run","fromSide":"right","toNode":"agg","toSide":"left"},
+		{"id":"e2","fromNode":"agg","fromSide":"right","toNode":"map","toSide":"left"},
+		{"id":"e3","fromNode":"agg","fromSide":"bottom","toNode":"lead","toSide":"top"},
+		{"id":"e4","fromNode":"map","fromSide":"right","toNode":"win","toSide":"left"},
+		{"id":"e5","fromNode":"map","fromSide":"right","toNode":"fail","toSide":"left"}
+	]
+}

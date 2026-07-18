@@ -1,0 +1,28 @@
+{
+	"nodes":[
+		{"id":"t","type":"text","text":"# 👹 Monsters — how it works\n_biome → types → a pack you fight. Our design surface — expand it._","x":-20,"y":-320,"width":720,"height":80},
+		{"id":"biome","type":"text","text":"## 🌲 Biome ✅\nset by [[delve-generation]]\nv1: Meadow · Forest · Swamp","x":-20,"y":-160,"width":220,"height":150},
+		{"id":"set","type":"text","text":"## Monster set\nroles + biome creatures + 1 signature ✅","x":280,"y":-160,"width":220,"height":120},
+		{"id":"arch","type":"text","text":"## Archetypes ↓","x":580,"y":-160,"width":220,"height":120},
+		{"id":"a1","type":"text","text":"Grunt — fair melee filler","x":580,"y":-10,"width":220,"height":60},
+		{"id":"a2","type":"text","text":"Swarm — many & weak · feeds AoE","x":580,"y":70,"width":220,"height":60},
+		{"id":"a3","type":"text","text":"Skirmisher — ranged · pull carefully","x":580,"y":150,"width":220,"height":60},
+		{"id":"a4","type":"text","text":"Brute — soaks, slow","x":580,"y":230,"width":220,"height":60},
+		{"id":"a5","type":"text","text":"Elite — rare, big drops","x":580,"y":310,"width":220,"height":60},
+		{"id":"a6","type":"text","text":"⭐ Trial boss — gates [[advancement]]","x":580,"y":390,"width":220,"height":60,"color":"2"},
+		{"id":"sig","type":"text","text":"## Each =\nstats + 1 signature move\n(knockback, heal ally…)","x":880,"y":-160,"width":220,"height":180},
+		{"id":"pack","type":"text","text":"## Compose a pack\nmix archetypes\n(swarm + skirmisher = scary)","x":1160,"y":-160,"width":230,"height":150},
+		{"id":"scale","type":"text","text":"## Scale\nto hero level / delve depth","x":1450,"y":-160,"width":220,"height":120},
+		{"id":"toc","type":"text","text":"## → a fight\n[[combat]]","x":1730,"y":-160,"width":190,"height":120,"color":"2"},
+		{"id":"q","type":"text","text":"❓ **Open questions**\n✅ biome-themed · roles · 3 biomes\n✅ scale by depth + biome tier\n✅ stats + 1 signature move (no mana)\n• boss phases + telegraphs?","x":1160,"y":40,"width":510,"height":160,"color":"6"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"biome","fromSide":"right","toNode":"set","toSide":"left"},
+		{"id":"e2","fromNode":"set","fromSide":"right","toNode":"arch","toSide":"left"},
+		{"id":"e3","fromNode":"arch","fromSide":"bottom","toNode":"a1","toSide":"top"},
+		{"id":"e4","fromNode":"arch","fromSide":"right","toNode":"sig","toSide":"left"},
+		{"id":"e5","fromNode":"sig","fromSide":"right","toNode":"pack","toSide":"left"},
+		{"id":"e6","fromNode":"pack","fromSide":"right","toNode":"scale","toSide":"left"},
+		{"id":"e7","fromNode":"scale","fromSide":"right","toNode":"toc","toSide":"left"}
+	]
+}
