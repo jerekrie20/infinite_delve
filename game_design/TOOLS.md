@@ -52,12 +52,13 @@ slated for deletion.
 - `npm run type-check` / `npm run lint` / `npm run test` — the green-bar checks.
 - `npm run deploy` / `npm run launch` — upload / submit for review.
 
-## GameMaker → Devvit (future DELVE client)
+## Phaser → Devvit (the DELVE client)
 
-The new client will be built in **GameMaker**, exported to Devvit. Workflow:
-GameMaker *Run* builds WASM → copies to the Devvit `src/client/public/` →
-`npm run dev` auto-uploads. Server stays TypeScript. Full guide is saved in
-memory (`gamemaker-devvit-build-guide`). Limit: 100 MB / 30 s per upload.
+The client is built in **Phaser** (TypeScript, WebGL), bundled by **Vite** into
+the Devvit webview — code-only, no IDE. Workflow: edit `src/client` → preview
+locally with `npx vite --config vite.preview.mjs` (http://localhost:5178, mock
+API) → `npm run dev` (`devvit playtest`) builds + uploads to the test sub.
+Server stays TypeScript. Limit: 100 MB / 30 s per upload.
 
 ## Obsidian — this vault
 

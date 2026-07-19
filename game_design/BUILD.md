@@ -9,7 +9,7 @@ The plan for turning the design into a playable thing. Build the **foundation
 first**: one simple version of the whole loop, running in a Reddit post, before
 any deep content. Hub: [[Home]]. Design lives in [[mechanics-index]].
 
-> **v0 goal:** prove the **core delve loop is fun** AND the **GameMaker→Devvit
+> **v0 goal:** prove the **core delve loop is fun** AND the **Phaser→Devvit
 > pipeline works end-to-end.** Nothing else.
 
 ## v0 scope
@@ -23,7 +23,7 @@ any deep content. Hub: [[Home]]. Design lives in [[mechanics-index]].
 - **Loot:** gold + a couple of basic gear drops → backpack → **extract-or-die**
   ([[loot-gear]]).
 - **Hero persists:** class · level · HP · gold · stash saved server-side.
-- Runs **inside a Reddit post** (GameMaker client ↔ TS server).
+- Runs **inside a Reddit post** (Phaser client ↔ TS server).
 
 **DEFERRED (layer on after v0):** class trees & [[advancement]], more classes,
 abilities/mana, the [[frontier]] & community layer, the Daily Delve &
@@ -33,9 +33,9 @@ test the core loop.
 
 ## Architecture (recap)
 
-GameMaker **client** (WASM in the Reddit webview) + TypeScript **server**
+Phaser **client** (WebGL in the Reddit webview) + TypeScript **server**
 (Devvit/Redis). Reuse the Faction War **map generator** for delve layouts. See
-[[ARCHITECTURE]], [[TOOLS]], and memory `gamemaker-devvit-build-guide`.
+[[ARCHITECTURE]] and [[TOOLS]].
 
 - **Reusable code to pull in:** from `../factionwar2000/src` — the pure modules
   `shared/noise.ts`, `shared/grid.ts`, `shared/terrain.ts`, `shared/mapParams.ts`,
@@ -44,16 +44,17 @@ GameMaker **client** (WASM in the Reddit webview) + TypeScript **server**
 
 ## Who does what
 
-- **TS server + shared code + GML scripts** → Claude can write directly.
-- **GameMaker project** (objects, rooms, sprites, running the IDE) → you. Claude
-  can hand you GML to paste and plan the structure, but can't drive the IDE.
+- **TS server + shared code + the Phaser client** → Claude can write directly
+  (Phaser is code-only — there's no IDE to drive).
+- **Art** (sprites, PixelLab generations, asset packs) → you provide; Claude
+  wires them into the client.
 
 ## Build order
 
 ### Step 1 — Pipeline  ⬅️ (you're doing this)
-Get the **GameMaker → Devvit template** running: a blank game showing in a
-test-subreddit post. Follow `HowToBuild.md` / the Reddit "GameMaker" template.
-**Done when:** you hit Run in GameMaker and see it in a Reddit post.
+Get the **Phaser + Devvit client** running: a blank game showing in a
+test-subreddit post via `npm run dev`.
+**Done when:** `devvit playtest` renders the client in a Reddit post.
 
 ### Step 2 — Server (TS)
 Adapt the template's `src/server`:
@@ -63,7 +64,7 @@ Adapt the template's `src/server`:
   [[delve-generation]].)
 - **Hero state in Redis** — key `hero:{userId}` → `{ class, level, xp, hp,
   maxHp, gold, stash[], equipped{} }`.
-- **Endpoints (HTTP ↔ `reddit_*_server_api.gml`):**
+- **Endpoints (HTTP ↔ `src/client/api.ts`):**
   - `POST /api/hero` → get-or-create the player's hero; returns hero state.
   - `POST /api/delve/start` → returns a generated delve (tiles, monsters, loot,
     extract) + the run seed; stash the active seed at `run:{userId}`.
@@ -73,15 +74,16 @@ Adapt the template's `src/server`:
 - **Anti-cheat:** v0 **trusts the client** (co-op PvE, no leaderboard yet).
   Add server re-sim later, before the Daily/leaderboard ship.
 
-### Step 3 — Client (GameMaker)
+### Step 3 — Client (Phaser)
 The core loop, talking to the server. Suggested structure:
-- **Rooms:** `rmHub` (see hero, Delve button) · `rmDelve` (the run).
-- **Objects:** `oGame` (controller + HTTP), `oHero` (move, HP, auto-attack),
-  `oMonster` (grunt/swarm: HP, auto-attack, 1 signature later), `oLoot`
-  (pickup), `oExtract`, `oUI` (HP · gold · backpack).
-- **Scripts:** the template's server API + `scr_delve_build` (server JSON →
-  build the room), `scr_autobattle` (stationary engage: both sides lose HP on a
-  timer until one dies or hero retreats), `scr_hero_stats`.
+- **Scenes:** a hub scene (see hero, Delve button) · a delve scene (the run).
+- **Game objects:** a game controller (HTTP), the hero (move, HP, auto-attack),
+  monsters (grunt/swarm: HP, auto-attack, 1 signature later), loot (pickup),
+  the extract point, and the UI (HP · gold · backpack).
+- **Modules:** the client API (`src/client/api.ts`) + a delve builder (server
+  JSON → build the scene), an auto-battle routine (stationary engage: both
+  sides lose HP on a timer until one dies or the hero retreats), hero-stats
+  helpers.
 - **Loop:** hub → start delve → explore fog → touch monster → auto-battle → grab
   loot → reach extract (bank) or die (lose unbanked) → submit result → hub.
 

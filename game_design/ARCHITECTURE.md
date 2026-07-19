@@ -15,7 +15,7 @@ factionwar2000. Mechanics detail comes Thu/Fri; this is the container.*
 ```
         Reddit post (iframe)                 Reddit servers
    ┌───────────────────────────┐        ┌───────────────────────────┐
-   │  GameMaker client (WASM)  │  HTTP  │  TypeScript server (Devvit)│
+   │  Phaser client (WebGL)    │  HTTP  │  TypeScript server (Devvit)│
    │                           │ <────> │                            │
    │  • render delve/hero/mobs │        │  • generate delve + world  │
    │  • animation + juice      │        │  • hero state (Redis)      │
@@ -32,17 +32,18 @@ factionwar2000. Mechanics detail comes Thu/Fri; this is the container.*
 
 **Rule of thumb:** if it must be trusted, persistent, or run while nobody's
 watching → server (TS). If the player sees or touches it live → client
-(GameMaker).
+(Phaser).
 
-## Client (GameMaker) owns
+## Client (Phaser) owns
 
-- Rendering the delve from server-sent map data (native tilemap + autotiling).
+- Rendering the delve from server-sent map data (Phaser tilemaps + sprites).
 - Hero, monsters, loot, projectiles, hit effects, animation, screen juice.
 - Input, turn/action handling, local combat resolution & prediction.
 - All UI: inventory, character sheet, shop, ability bar, the frontier meta
-  screen. *(The tedious part — GML UI is more work than Vue. Accepted cost.)*
-- Talks to the server over HTTP (the template's `reddit_demo_server_api.gml`
-  pattern ↔ `src/server/index.ts`).
+  screen. *(The tedious part — hand-built Phaser UI is more work than Vue.
+  Accepted cost.)*
+- Talks to the server over HTTP (`fetch` in `src/client/api.ts` ↔
+  `src/server/index.ts`).
 
 ## Server (TypeScript, kept from factionwar2000) owns
 
@@ -91,12 +92,12 @@ watching → server (TS). If the player sees or touches it live → client
 
 **DISCARD:**
 - The entire Vue client (`src/client/*.vue`, `topDownRender.ts`, `useTileset.ts`,
-  `autotile.ts`, components) → rebuilt in GameMaker (autotiling becomes native).
+  `autotile.ts`, components) → rebuilt in Phaser (code-only TypeScript client).
 
-## Why GameMaker client is right here (rationale, so we don't relitigate)
+## Why Phaser client is right here (rationale, so we don't relitigate)
 
 1. New game = client rebuilt anyway → no "throwing away a working client" cost.
-2. RPG is animation/sprite/juice-heavy = GameMaker's strength.
+2. RPG is animation/sprite/juice-heavy = Phaser's strength.
 3. Delve generation is server-side → Vue's code-sharing edge doesn't apply.
 4. Co-op PvE → combat can be client-side; the "Devvit can't do authoritative
    realtime" objection softens.
@@ -109,8 +110,8 @@ becomes the explicit goal — it changes everything (and points off Reddit).
 
 ## Open architecture questions (for later, not Thu/Fri's mechanics focus)
 
-- Exact HTTP contract between GML client and TS server (endpoints, payloads).
+- Exact HTTP contract between the Phaser client and TS server (endpoints, payloads).
 - How much of a run the server re-simulates vs trusts (anti-cheat depth).
 - Redis key schema for hero + per-sub frontier + daily runs.
-- Devvit upload size with GameMaker WASM + Tiny Swords + gear sprites (limit
+- Devvit upload size with the Phaser bundle + Tiny Swords + gear sprites (limit
   is 100 MB / 30 s — generous, but track it).

@@ -63,7 +63,7 @@ export interface Hero {
 export type Biome = 'meadow';
 
 /** Terrain kinds, stored as ints in `DelveMap.tiles` (row-major) for a compact
- * payload the GameMaker client can index directly. */
+ * payload the client can index directly. */
 export const Terrain = {
   Grass: 0,
   Tree: 1,

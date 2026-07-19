@@ -14,7 +14,7 @@ connect, and the **backlinks** panel at the bottom of each note.
 ## Start here
 
 - [[CORE_LOOP]] — what a player does, at every timescale
-- [[ARCHITECTURE]] — GameMaker client / TypeScript server split
+- [[ARCHITECTURE]] — Phaser client / TypeScript server split
 - [[mechanics-index]] — the mechanics stack (design order + status)
 - [[FINALIZE]] — ⭐ open decisions to lock (review these)
 - [[BUILD]] — 🔨 the v0 vertical-slice build plan (start here to build)

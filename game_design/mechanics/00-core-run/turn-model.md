@@ -30,7 +30,7 @@ Two sub-parts: how you EXPLORE, and how you FIGHT.
 5. **The class + build you brought** (Decision 7 + folders 02/03).
 
 **Why auto-battle wins here:** even more mobile/lurker-friendly than turn-based,
-easier to make juicy in GameMaker, and still cheat-safe — combat is
+easier to make juicy in Phaser, and still cheat-safe — combat is
 DETERMINISTIC, so the TS server re-simulates each fight from the seed + the
 player's ability-input log to validate loot/XP.
 

@@ -41,7 +41,7 @@ graph LR
 
 ## Feeds
 
-- **Client (GameMaker):** the model + verbs define input & feel — see
+- **Client (Phaser):** the model + verbs define input & feel — see
   [[ARCHITECTURE]].
 - **Server (TS):** the deterministic fight defines the anti-cheat contract.
 - **[[combat]]** builds directly on this; [[classes]] and [[monsters]] plug in.

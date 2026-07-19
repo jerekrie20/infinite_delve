@@ -2,7 +2,7 @@ You are writing a Devvit web application that will be executed on Reddit.com.
 
 ## Tech Stack
 
-- **Frontend**: GameMaker, Vite
+- **Frontend**: Phaser, Vite
 - **Backend**: Node.js v22 serverless environment (Devvit), Hono, TRPC
 - **Communication**: tRPC v11 for end-to-end type safety
 
