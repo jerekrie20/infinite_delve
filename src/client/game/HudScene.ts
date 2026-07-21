@@ -290,7 +290,7 @@ export class HudScene extends Phaser.Scene {
       if (!dot) return;
       const item = this.hero.equipped[slot];
       if (item) {
-        const hex = item.unique ? UNIQUE_HEX : item.set ? SET_HEX : RARITY_HEX[item.rarity] ?? 0xffffff;
+        const hex = item.unique ? UNIQUE_HEX : item.set ? SET_HEX : RARITY_HEX[item.r] ?? 0xffffff;
         dot.setVisible(true).setFillStyle(hex);
       } else dot.setVisible(false);
     });

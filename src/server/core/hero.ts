@@ -34,6 +34,43 @@ export interface StoredHero {
   equipped: Partial<Record<GearSlot, GearItem>>;
 }
 
+// ---- GearItem migration: old keys → lean keys --------------------------------
+
+/** Migrate a single item from the old stored shape (`name`, `rarity`, `stats`)
+ *  to the lean v2 shape (`r`, `s`, name rebuilt on read). Idempotent — items
+ *  already in the new shape pass through unchanged. */
+function migrateItem(raw: Record<string, unknown>): GearItem | null {
+  if (!raw || typeof raw.id !== 'string' || typeof raw.slot !== 'string') return null;
+  // Old key `rarity` → new key `r`; new key wins if both present.
+  const r = (raw.r ?? raw.rarity ?? 'common') as GearItem['r'];
+  // Old key `stats` → new key `s`; new key wins if both present.
+  const s = (raw.s ?? raw.stats ?? {}) as GearItem['s'];
+  return {
+    id: raw.id as string,
+    slot: raw.slot as GearSlot,
+    r,
+    base: (raw.base as string) ?? 'blade',
+    ...(raw.set ? { set: raw.set as string } : {}),
+    ...(raw.unique ? { unique: raw.unique as string } : {}),
+    s,
+  };
+}
+
+function migrateGearArray(arr: unknown): GearItem[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((it) => migrateItem(it as Record<string, unknown>)).filter(Boolean) as GearItem[];
+}
+
+function migrateGearRecord(obj: unknown): Partial<Record<GearSlot, GearItem>> {
+  if (!obj || typeof obj !== 'object') return {};
+  const out: Partial<Record<GearSlot, GearItem>> = {};
+  for (const [slot, raw] of Object.entries(obj as Record<string, unknown>)) {
+    const item = migrateItem(raw as Record<string, unknown>);
+    if (item) out[slot as GearSlot] = item;
+  }
+  return out;
+}
+
 export interface RunGained {
   gold: number;
   xp: number;
@@ -191,10 +228,14 @@ export function applyRun(
 export async function getOrCreateHero(userId: string): Promise<StoredHero> {
   const raw = await redis.get(heroKey(userId));
   if (raw) {
-    const h = JSON.parse(raw) as StoredHero;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
     // Back-fill fields added after a hero was first stored.
-    if (typeof h.bestDepth !== 'number') h.bestDepth = 1;
-    if (typeof h.lastSeenAt !== 'number') h.lastSeenAt = Date.now();
+    if (typeof parsed.bestDepth !== 'number') parsed.bestDepth = 1;
+    if (typeof parsed.lastSeenAt !== 'number') parsed.lastSeenAt = Date.now();
+    // Migrate old-format gear items (name/rarity/stats → r/s) to the lean v2 shape.
+    parsed.stash = migrateGearArray(parsed.stash);
+    parsed.equipped = migrateGearRecord(parsed.equipped);
+    const h = parsed as unknown as StoredHero;
     recompute(h); // keep derived maxHp consistent with current gear/level
     return h;
   }

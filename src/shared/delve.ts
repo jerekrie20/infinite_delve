@@ -26,11 +26,16 @@ export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
  *  stat registry (only the stats this item rolled are present). */
 export type GearStats = Partial<Record<StatId, number>>;
 
+/** A gear item that dropped or is worn. The stored shape uses short keys (`r`,
+ *  `s`) because every hero carries up to ~36 items in Redis and the bytes saved
+ *  per key add up at scale. `name` is NOT stored — rebuild it via `itemName()`
+ *  (content/items.ts). */
 export interface GearItem {
   id: string;
-  name: string;
+  /** Gear slot this item occupies (kept — cheap, used everywhere). */
   slot: GearSlot;
-  rarity: Rarity;
+  /** Rarity tier (short key `r` in JSON). */
+  r: Rarity;
   /** Base-item id this rolled from (content/items.ts BASES) — drives name + slot. */
   base: string;
   /** Set id this item belongs to (content/sets.ts), if any — colors it + counts
@@ -38,8 +43,9 @@ export interface GearItem {
   set?: string;
   /** Unique-item id (content/uniques.ts), if this is a unique — colors it gold. */
   unique?: string;
-  /** One-to-many stat bonuses (primary + rarity-many affixes; sparse map). */
-  stats: GearStats;
+  /** One-to-many stat bonuses (primary + rarity-many affixes; sparse map).
+   *  Short key `s` in JSON. */
+  s: GearStats;
 }
 
 /** Persisted hero state (Redis `hero:{userId}`), enriched with derived combat

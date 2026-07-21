@@ -36,6 +36,19 @@ export const RARITY_BY_ID: Record<Rarity, RarityTier> = Object.fromEntries(
   RARITIES.map((r) => [r.id, r])
 ) as Record<Rarity, RarityTier>;
 
+/** Rebuild the display name from the item's data (NO stored `name` field — saves
+ *  bytes in Redis across ~36 items per hero). Uniques carry their own title;
+ *  everything else is "{Rarity} {Base}" (e.g. "Rare Blade"). */
+export function itemName(it: GearItem): string {
+  if (it.unique) {
+    const u = UNIQUE_BY_ID[it.unique];
+    if (u) return u.name;
+  }
+  const rarityName = RARITY_BY_ID[it.r]?.name ?? it.r;
+  const baseName = BASE_BY_ID[it.base]?.name ?? it.base;
+  return `${rarityName} ${baseName}`;
+}
+
 /** A base item: one per drop slot. `primary` always rolls (scaled by full
  *  budget); `pool` is the affix menu rarity draws extra stats from. Keep `pool`
  *  disjoint from `primary` so affixes never duplicate the primary line. Set
@@ -144,13 +157,12 @@ function maybeRollUnique(rng: Rng): GearItem | null {
   }
   return {
     id: newId(rng),
-    name: chosen.name,
     slot: chosen.slot,
-    rarity: chosen.rarity,
+    r: chosen.rarity,
     base: chosen.base,
     unique: chosen.id,
     ...(chosen.set ? { set: chosen.set } : {}),
-    stats,
+    s: stats,
   };
 }
 
@@ -181,12 +193,11 @@ export function rollGear(depth: number, rng: Rng = Math.random): GearItem {
   }
   return {
     id: newId(rng),
-    name: `${rarity.name} ${base.name}`,
     slot: base.slot,
-    rarity: rarity.id,
+    r: rarity.id,
     base: base.id,
     ...(setId ? { set: setId } : {}),
-    stats,
+    s: stats,
   };
 }
 
@@ -201,7 +212,7 @@ export function rollDrop(depth: number, isSwarm: boolean, rng: Rng = Math.random
  *  Sums every carried stat × its registry `value`, so new stats score for free. */
 export function gearScore(item: GearItem): number {
   let score = 0;
-  for (const id of STAT_IDS) score += (item.stats[id] ?? 0) * STATS[id].value;
+  for (const id of STAT_IDS) score += (item.s[id] ?? 0) * STATS[id].value;
   return score;
 }
 
@@ -228,39 +239,42 @@ export function sanitizeGearItem(raw: unknown, depth: number): GearItem | null {
   const o = raw as Record<string, unknown>;
   const slot = o.slot as GearSlot;
   if (!VALID_SLOTS.includes(slot)) return null;
-  const rawStats = (o.stats ?? {}) as Record<string, unknown>;
 
   // --- Unique path: validate signature lines against the unique's own bands ---
   const uniq = typeof o.unique === 'string' ? UNIQUE_BY_ID[o.unique] : undefined;
   if (uniq && uniq.slot === slot) {
     const stats: GearStats = {};
+    // Accept old key `stats` or new key `s` from client hauls.
+    const rawStats = ((o.s ?? o.stats) ?? {}) as Record<string, unknown>;
     for (const id of STAT_IDS) {
       const band = uniq.stats[id];
       if (!band) continue;
-      const v = clampStat(rawStats[id], Math.floor(band[1] * 1.25)); // small slack over band max
+      const v = clampStat(rawStats[id], Math.floor(band[1] * 1.25));
       if (v > 0) stats[id] = v;
     }
     if (STAT_IDS.every((id) => stats[id] === undefined)) return null;
     return {
       id: safeId(o.id),
-      name: uniq.name,
       slot,
-      rarity: uniq.rarity,
+      r: uniq.rarity,
       base: uniq.base,
       unique: uniq.id,
       ...(uniq.set ? { set: uniq.set } : {}),
-      stats,
+      s: stats,
     };
   }
 
   // --- Generic / set path ---
-  if (!VALID_RARITIES.includes(o.rarity as Rarity)) return null;
+  // Accept old key `rarity` or new key `r` from client hauls.
+  const claimedRarity = (o.r ?? o.rarity) as Rarity;
+  if (!VALID_RARITIES.includes(claimedRarity)) return null;
   const d = Math.max(1, Math.floor(depth));
   // Generous ceiling: a legendary's budget at this depth with slack.
   const budgetCap = (TUNING.items.budgetBase + d * TUNING.items.budgetPerDepth) * 3.6 * 1.5;
   // Per-stat cap: a hard `max` if the stat has one (e.g. defense%/crit), else the
   // pct band ceiling (rarity + slack) or the depth budget via its perBudget rate.
   const stats: GearStats = {};
+  const rawStats = ((o.s ?? o.stats) ?? {}) as Record<string, unknown>;
   for (const id of STAT_IDS) {
     const def = STATS[id];
     const uncapped =
@@ -277,15 +291,14 @@ export function sanitizeGearItem(raw: unknown, depth: number): GearItem | null {
   const base = claimed && claimed.slot === slot ? claimed : BASE_BY_SLOT[slot];
   const baseId = base?.id ?? 'blade';
   const setId = SET_BY_BASE[baseId];
-  const rarity = setId ? SETS[setId]!.rarity : (o.rarity as Rarity);
+  const rarity = setId ? SETS[setId]!.rarity : claimedRarity;
   return {
     id: safeId(o.id),
-    name: typeof o.name === 'string' ? o.name.slice(0, 40) : 'Item',
     slot,
-    rarity,
+    r: rarity,
     base: baseId,
     ...(setId ? { set: setId } : {}),
-    stats,
+    s: stats,
   };
 }
 

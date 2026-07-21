@@ -5,6 +5,7 @@
 // ('hero-changed'). Tapping a gear slot or the Bag opens the existing gear panel.
 
 import type { GearSlot, Hero } from '../../shared/delve';
+import { itemName } from '../../shared/content/items';
 import { openGearPanel } from './gear';
 
 /** Live combat + hero state the HUD paints from. */
@@ -176,9 +177,9 @@ function renderGear(hero: Hero): void {
   for (const { slot, icon, label } of GEAR_SLOTS) {
     const it = hero.equipped[slot];
     if (it) {
-      const color = RARITY_COLORS[it.rarity] ?? '#ffffff';
+      const color = RARITY_COLORS[it.r] ?? '#ffffff';
       cells.push(
-        `<div class="gslot" style="border-color:${color}" title="${esc(`${label}: ${it.name}`)}">${icon}</div>`
+        `<div class="gslot" style="border-color:${color}" title="${esc(`${label}: ${itemName(it)}`)}">${icon}</div>`
       );
     } else {
       cells.push(`<div class="gslot empty" title="${esc(label)} — empty">${icon}</div>`);

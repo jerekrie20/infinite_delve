@@ -4,7 +4,7 @@
 // so it works both server-backed and offline (preview).
 
 import type { GearItem, GearSlot, Hero } from '../../shared/delve';
-import { gearScore, sellValue } from '../../shared/content/items';
+import { gearScore, itemName, sellValue } from '../../shared/content/items';
 import { STAT_IDS, formatStat } from '../../shared/content/stats';
 import { activeSets } from '../../shared/content/gear';
 import { SETS } from '../../shared/content/sets';
@@ -110,7 +110,7 @@ function esc(s: string): string {
 function statLabel(it: GearItem): string {
   const parts: string[] = [];
   for (const id of STAT_IDS) {
-    const v = it.stats[id];
+    const v = it.s[id];
     if (v) parts.push(formatStat(id, v));
   }
   return parts.join('  ');
@@ -120,7 +120,7 @@ function statLabel(it: GearItem): string {
 function itemColor(it: GearItem): string {
   if (it.unique) return UNIQUE_COLOR;
   if (it.set) return SET_COLOR;
-  return RARITY_COLORS[it.rarity] ?? '#ffffff';
+  return RARITY_COLORS[it.r] ?? '#ffffff';
 }
 
 // ---- item detail popup (mobile tap-to-inspect) ----------------------------
@@ -152,7 +152,7 @@ function closeItemPopup(): void {
 }
 
 const quality = (it: GearItem): string =>
-  it.unique ? 'Unique' : it.set ? 'Set' : it.rarity.charAt(0).toUpperCase() + it.rarity.slice(1);
+  it.unique ? 'Unique' : it.set ? 'Set' : it.r.charAt(0).toUpperCase() + it.r.slice(1);
 
 /**
  * Open the mobile item-detail popup for a single item. Shows a sprite placeholder
@@ -164,8 +164,8 @@ export function openItemPopup(it: GearItem, opts: { equipped?: boolean } = {}): 
   const body = el.querySelector('.item-pop-body') as HTMLElement;
   const col = itemColor(it);
   const meta = SLOT_META[it.slot];
-  const stats = STAT_IDS.filter((id) => it.stats[id]).map(
-    (id) => `<div class="ip-stat">${formatStat(id, it.stats[id]!)}</div>`
+  const stats = STAT_IDS.filter((id) => it.s[id]).map(
+    (id) => `<div class="ip-stat">${formatStat(id, it.s[id]!)}</div>`
   ).join('');
   const setName = it.set ? SETS[it.set]?.name : undefined;
   const actions = opts.equipped
@@ -175,7 +175,7 @@ export function openItemPopup(it: GearItem, opts: { equipped?: boolean } = {}): 
 
   body.innerHTML =
     `<div class="ip-sprite" style="border-color:${col}">${meta?.icon ?? '❔'}</div>` +
-    `<div class="ip-name" style="color:${col}">${esc(it.name)}</div>` +
+    `<div class="ip-name" style="color:${col}">${esc(itemName(it))}</div>` +
     `<div class="ip-tag">${quality(it)} · ${meta?.label ?? it.slot}</div>` +
     (stats ? `<div class="ip-stats">${stats}</div>` : '') +
     (setName ? `<div class="ip-set">Part of <b>${esc(setName)}</b></div>` : '') +
@@ -224,7 +224,7 @@ function render(): void {
       parts.push(
         `<div class="gear-slot tappable" data-open-slot="${slot}">` +
           `<span class="slot-label">${label}</span>` +
-          `<span class="slot-item" style="color:${itemColor(it)}">${esc(it.name)} <em>${statLabel(it)}</em></span>` +
+          `<span class="slot-item" style="color:${itemColor(it)}">${esc(itemName(it))} <em>${statLabel(it)}</em></span>` +
           `<span class="row-chevron">›</span>` +
           `</div>`
       );
@@ -275,7 +275,7 @@ function stashRow(it: GearItem): string {
   return (
     `<div class="stash-item tappable" data-open-id="${esc(it.id)}">` +
     `<div class="item-info">` +
-    `<span class="item-name" style="color:${itemColor(it)}">${esc(it.name)}</span>` +
+    `<span class="item-name" style="color:${itemColor(it)}">${esc(itemName(it))}</span>` +
     `<span class="item-stat">${statLabel(it)}</span>` +
     `</div>` +
     `<span class="item-sell">◆${sellValue(it)}</span>` +

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { GearItem, GearSlot, Hero } from '../../shared/delve';
 import { monsterForDepth, type IdleGains, type MonsterKind } from '../../shared/waves';
 import { TUNING } from '../../shared/content/tuning';
-import { rollDrop, sellValue } from '../../shared/content/items';
+import { itemName, rollDrop, sellValue } from '../../shared/content/items';
 import { bankHaul, deriveStats, equipItem, sellItem, unequipSlot } from '../../shared/content/gear';
 import { postEquip, postRunResult, postSell } from '../api';
 
@@ -50,7 +50,7 @@ const RARITY_COLORS: Record<string, string> = {
 const SET_COLOR = '#2ecf7f';
 const UNIQUE_COLOR = '#ff8a3d';
 const itemColor = (it: GearItem): string =>
-  it.unique ? UNIQUE_COLOR : it.set ? SET_COLOR : RARITY_COLORS[it.rarity] ?? '#ffffff';
+  it.unique ? UNIQUE_COLOR : it.set ? SET_COLOR : RARITY_COLORS[it.r] ?? '#ffffff';
 
 interface Combatant {
   hp: number;
@@ -448,7 +448,7 @@ export class LaneScene extends Phaser.Scene {
     const color = itemColor(item);
     const prefix = item.unique ? '★' : item.set ? '❖' : '✦';
     const txt = this.add
-      .text(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 70, `${prefix} ${item.name}`, {
+      .text(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 70, `${prefix} ${itemName(item)}`, {
         fontFamily: 'Arial', fontSize: '30px', color, fontStyle: 'bold', align: 'center',
       })
       .setOrigin(0.5)

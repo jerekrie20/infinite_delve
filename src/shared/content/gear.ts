@@ -103,7 +103,7 @@ export function deriveStats(
   const setCounts: Record<string, number> = {};
   for (const item of Object.values(equipped)) {
     if (!item) continue;
-    for (const id of STAT_IDS) add(id, item.stats[id] ?? 0);
+    for (const id of STAT_IDS) add(id, item.s[id] ?? 0);
     if (item.set) setCounts[item.set] = (setCounts[item.set] ?? 0) + 1;
   }
   // Set-bonus pass: every set whose piece-threshold is met folds in its stats.
