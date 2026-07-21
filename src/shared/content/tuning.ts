@@ -54,11 +54,18 @@ export interface ItemTuning {
   budgetPerDepth: number;
   /** Fraction of full budget each rolled affix gets (primary gets the full budget). */
   affixBudgetFrac: number;
-  /** Per-drop chance the item is a UNIQUE instead of a generic/set roll, 0..1. */
+  /** Base chance an item drops as a UNIQUE, 0..1, at depth 0. */
   uniqueChance: number;
-  /** Chance a set-MEMBER base drops as a set item (its set's tier) vs a normal
-   *  common→legendary roll, 0..1. Keeps the generic loot ladder for those slots. */
+  /** Extra unique chance per depth (additive). Capped by uniqueChanceCap. */
+  uniqueChancePerDepth: number;
+  /** Ceiling for unique chance after depth scaling. */
+  uniqueChanceCap: number;
+  /** Base chance a set-MEMBER base drops as a set item, 0..1, at depth 0. */
   setChance: number;
+  /** Extra set chance per depth (additive). Capped by setChanceCap. */
+  setChancePerDepth: number;
+  /** Ceiling for set chance after depth scaling. */
+  setChanceCap: number;
   /** Fraction of an item's combat value returned as gold when sold. */
   sellValueMult: number;
 }
@@ -108,8 +115,14 @@ export const TUNING: Tuning = {
     budgetBase: 3,
     budgetPerDepth: 0.8,
     affixBudgetFrac: 0.5,
-    uniqueChance: 0.03,
-    setChance: 0.15,
+    // Uniques: 1% base, +0.02%/depth → ~3% by depth 100, capped at 5%
+    uniqueChance: 0.01,
+    uniqueChancePerDepth: 0.0002,
+    uniqueChanceCap: 0.05,
+    // Sets: 5% base, +0.05%/depth → ~10% by depth 100, capped at 15%
+    setChance: 0.05,
+    setChancePerDepth: 0.0005,
+    setChanceCap: 0.15,
     sellValueMult: 0.5,
   },
 };

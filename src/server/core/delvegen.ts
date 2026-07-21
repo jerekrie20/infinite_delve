@@ -88,20 +88,20 @@ const DECOR_KINDS: readonly DecorKind[] = ['rock', 'bush', 'flowers', 'log', 'mu
 
 /** Base gear pool for ordinary scattered loot. */
 const GEAR_POOL: readonly Omit<GearItem, 'id'>[] = [
-  { name: 'Rusty Sword', slot: 'hand1', rarity: 'common', base: 'blade', stats: { attack: 2 } },
-  { name: 'Oak Buckler', slot: 'hand2', rarity: 'common', base: 'buckler', stats: { defensePct: 5, maxHp: 3 } },
-  { name: 'Leather Cap', slot: 'head', rarity: 'common', base: 'helm', stats: { maxHp: 4 } },
-  { name: 'Padded Vest', slot: 'body', rarity: 'common', base: 'armor', stats: { maxHp: 6, defensePct: 3 } },
-  { name: 'Worn Boots', slot: 'feet', rarity: 'common', base: 'boots', stats: { maxHp: 3 } },
-  { name: 'Meadow Charm', slot: 'amulet', rarity: 'uncommon', base: 'amulet', stats: { attack: 2, maxHp: 5 } },
+  { slot: 'hand1', r: 'common', base: 'blade', s: { attack: 2 } },
+  { slot: 'body', r: 'common', base: 'armor', s: { maxHp: 6, defensePct: 3 } },
+  { slot: 'head', r: 'common', base: 'helm', s: { maxHp: 4 } },
+  { slot: 'feet', r: 'common', base: 'boots', s: { maxHp: 3 } },
+  { slot: 'amulet', r: 'uncommon', base: 'amulet', s: { attack: 2, maxHp: 5 } },
+  { slot: 'ring1', r: 'uncommon', base: 'ring', s: { attack: 3 } },
 ];
 
 /** Richer pool — POIs guarantee a drop from here, so detours are worth it. */
 const POI_GEAR_POOL: readonly Omit<GearItem, 'id'>[] = [
-  { name: 'Grove Warden Blade', slot: 'hand1', rarity: 'rare', base: 'blade', stats: { attack: 5 } },
-  { name: 'Mesa Aegis', slot: 'hand2', rarity: 'rare', base: 'buckler', stats: { defensePct: 10, maxHp: 8 } },
-  { name: 'Sunken Circlet', slot: 'head', rarity: 'epic', base: 'helm', stats: { maxHp: 12, attack: 3 } },
-  { name: 'Warden Cloak', slot: 'body', rarity: 'rare', base: 'armor', stats: { maxHp: 10, defensePct: 4 } },
+  { slot: 'hand1', r: 'rare', base: 'blade', s: { attack: 5 } },
+  { slot: 'head', r: 'epic', base: 'helm', s: { maxHp: 12, attack: 3 } },
+  { slot: 'body', r: 'rare', base: 'armor', s: { maxHp: 10, defensePct: 4 } },
+  { slot: 'amulet', r: 'epic', base: 'amulet', s: { maxHp: 14, goldFindPct: 8 } },
 ];
 
 const idx = (x: number, y: number, w: number) => y * w + x;

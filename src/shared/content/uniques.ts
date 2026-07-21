@@ -34,7 +34,7 @@ export const UNIQUES: UniqueItem[] = [
     slot: 'hand1',
     base: 'blade',
     rarity: 'legendary',
-    stats: { attack: [55, 70], critChance: [15, 22], lifestealPct: [8, 14] },
+    stats: { attack: [55, 70], increasedCritPct: [30, 55], lifestealPct: [8, 14] },
     dropWeight: 1,
   },
   {

@@ -77,8 +77,15 @@ export type DerivedStats = DerivedMap;
 
 /** Derive combat stats from class + level + equipped gear via the generic
  *  modifier fold: every stat declares a `target` and an `op` (flat | pct), so
- *  derived = (base + Σflat) × (1 + Σpct/100), clamped by the target's cap. Adding
- *  a flat OR percentage stat needs no change here — only a registry row + a pool.
+ *  derived = (base + Σflat) × (1 + Σpct/100), clamped by the target's cap.
+ *
+ *  CRIT uses a PoE-style two-stat model so it stays valuable deep into the game:
+ *    baseCritChance     (flat, rare)  — seeded from TUNING, boosted by gear
+ *    increasedCritPct   (pct, common) — % increased crit, multiplied in after fold
+ *    critChance = min(baseCritChance × (1 + increasedCritPct/100), cap)
+ *
+ *  Behavioral stats (lifesteal, dodge, thorns, regen…) use op:'flat' so they
+ *  accumulate into their derived target via the fold without special-casing.
  *  Caller clamps current hp against the returned maxHp. */
 export function deriveStats(
   classId: HeroClass,
@@ -86,13 +93,15 @@ export function deriveStats(
   equipped: Partial<Record<GearSlot, GearItem>>
 ): DerivedStats {
   const cls = classDef(classId);
-  // Two accumulators per derived target: additive flat, and additive percent.
   const flat = zeroDerived();
   const pct = zeroDerived();
+
   // Base values seed the flat accumulators.
   flat.attack = cls.baseAttack + cls.attackPerLevel * (level - 1);
   flat.maxHp = cls.baseMaxHp + cls.hpPerLevel * (level - 1);
-  flat.critChance = TUNING.combat.critChance * 100; // innate crit everyone has
+  flat.baseCritChance = TUNING.combat.critChance * 100; // innate 5% base crit
+  flat.critMultiplier = TUNING.combat.critMultiplier;   // innate 1.5× multiplier
+  flat.healOnKillPct = Math.round(TUNING.combat.healOnKillPct * 100); // innate 45% heal
 
   const add = (statId: string, val: number): void => {
     const def = STATS[statId as keyof typeof STATS];
@@ -112,14 +121,23 @@ export function deriveStats(
     if (!def) continue;
     for (const b of def.bonuses) if (count >= b.pieces) add(b.stat, b.val);
   }
+
   // Combine flat × pct per target, round, clamp to the target's hard cap.
   const out = zeroDerived();
   for (const t of DERIVED_IDS) {
+    if (t === 'critChance') continue; // computed below
     let val = Math.round(flat[t] * (1 + pct[t] / 100));
     const cap = TARGET_MAX[t];
     if (cap !== undefined) val = Math.min(val, cap);
     out[t] = val;
   }
+
+  // Crit: PoE-style — base × (1 + increased%) then clamp.
+  const baseCrit = out.baseCritChance;
+  const increasedCrit = out.increasedCritPct;
+  const critCap = TARGET_MAX.critChance ?? 75;
+  out.critChance = Math.min(Math.round(baseCrit * (1 + increasedCrit / 100)), critCap);
+
   return out;
 }
 

@@ -68,12 +68,18 @@ export interface BaseItem {
  *  Weapons/jewelry pools carry the offensive behavioral stats (crit/lifesteal);
  *  armor rolls crit only — so a legendary weapon can reach 5 stat lines. */
 export const BASES: BaseItem[] = [
-  { id: 'blade', name: 'Blade', slot: 'hand1', primary: 'attack', pool: ['attackPct', 'maxHp', 'critChance', 'lifestealPct'] },
-  { id: 'armor', name: 'Armor', slot: 'body', primary: 'maxHp', pool: ['maxHpPct', 'defensePct', 'critChance'] },
-  { id: 'helm', name: 'Helm', slot: 'head', primary: 'maxHp', pool: ['maxHpPct', 'defensePct', 'attack'] },
-  { id: 'boots', name: 'Boots', slot: 'feet', primary: 'defensePct', pool: ['maxHp', 'maxHpPct', 'critChance'] },
-  { id: 'ring', name: 'Ring', slot: 'ring1', primary: 'attack', pool: ['attackPct', 'critChance', 'lifestealPct', 'maxHp'] },
-  { id: 'amulet', name: 'Amulet', slot: 'amulet', primary: 'maxHp', pool: ['attackPct', 'maxHpPct', 'critChance', 'lifestealPct'] },
+  { id: 'blade', name: 'Blade', slot: 'hand1', primary: 'attack',
+    pool: ['attackPct', 'maxHp', 'increasedCritPct', 'lifestealPct', 'baseCritChance', 'critMultiplier'] },
+  { id: 'armor', name: 'Armor', slot: 'body', primary: 'maxHp',
+    pool: ['maxHpPct', 'defensePct', 'increasedCritPct', 'thornsPct', 'hpRegen'] },
+  { id: 'helm', name: 'Helm', slot: 'head', primary: 'maxHp',
+    pool: ['maxHpPct', 'defensePct', 'attack', 'increasedCritPct', 'hpRegen'] },
+  { id: 'boots', name: 'Boots', slot: 'feet', primary: 'defensePct',
+    pool: ['maxHp', 'maxHpPct', 'dodgeChance', 'hpRegen', 'goldFindPct'] },
+  { id: 'ring', name: 'Ring', slot: 'ring1', primary: 'attack',
+    pool: ['attackPct', 'increasedCritPct', 'lifestealPct', 'maxHp', 'baseCritChance', 'critMultiplier', 'goldFindPct'] },
+  { id: 'amulet', name: 'Amulet', slot: 'amulet', primary: 'maxHp',
+    pool: ['attackPct', 'maxHpPct', 'increasedCritPct', 'lifestealPct', 'hpRegen', 'goldFindPct', 'damageReductionPct'] },
 ];
 
 /** Fast lookups by id / slot (base drives set membership + name rebuild). */
@@ -138,11 +144,23 @@ const bandRoll = (lo: number, hi: number, rng: Rng): number => Math.round(lo + r
 
 const droppableUniques = UNIQUES.filter((u) => u.dropWeight > 0);
 
+/** Unique chance at a given depth: base + depth × perDepth, capped. */
+function uniqueChanceAt(depth: number): number {
+  const it = TUNING.items;
+  return Math.min(it.uniqueChance + Math.max(0, depth) * it.uniqueChancePerDepth, it.uniqueChanceCap);
+}
+
+/** Set chance at a given depth: base + depth × perDepth, capped. */
+function setChanceAt(depth: number): number {
+  const it = TUNING.items;
+  return Math.min(it.setChance + Math.max(0, depth) * it.setChancePerDepth, it.setChanceCap);
+}
+
 /** Roll a unique item (each signature line within its band), or null if this drop
- *  isn't a unique. Uniques are a weighted entry in the loot table — a small chance
- *  per drop, then a drop-weighted pick among the eligible uniques. */
-function maybeRollUnique(rng: Rng): GearItem | null {
-  if (droppableUniques.length === 0 || rng() > TUNING.items.uniqueChance) return null;
+ *  isn't a unique. Uniques are a weighted entry in the loot table — chance scales
+ *  with depth, then a drop-weighted pick among the eligible uniques. */
+function maybeRollUnique(depth: number, rng: Rng): GearItem | null {
+  if (droppableUniques.length === 0 || rng() > uniqueChanceAt(depth)) return null;
   const total = droppableUniques.reduce((s, u) => s + u.dropWeight, 0);
   let roll = rng() * total;
   let chosen: UniqueItem = droppableUniques[droppableUniques.length - 1]!;
@@ -173,15 +191,15 @@ function maybeRollUnique(rng: Rng): GearItem | null {
  *  server-authoritative. Not-yet-implemented stats are skipped by the roller. */
 export function rollGear(depth: number, rng: Rng = Math.random): GearItem {
   const d = Math.max(1, Math.floor(depth));
-  const unique = maybeRollUnique(rng);
+  const unique = maybeRollUnique(d, rng);
   if (unique) return unique;
 
   const it = TUNING.items;
   const base = pick(BASES, rng);
-  // A set-member base drops as a set item only some of the time; otherwise it
-  // rolls a normal depth-weighted rarity, so the generic loot ladder survives.
+  // A set-member base drops as a set item only some of the time (scaling with
+  // depth); otherwise it rolls a normal depth-weighted rarity.
   const memberSet = SET_BY_BASE[base.id];
-  const setId = memberSet && rng() < it.setChance ? memberSet : undefined;
+  const setId = memberSet && rng() < setChanceAt(d) ? memberSet : undefined;
   const rarity = setId ? RARITY_BY_ID[SETS[setId]!.rarity] : rollRarity(d, rng);
   const budget = (it.budgetBase + d * it.budgetPerDepth) * rarity.statMult;
 

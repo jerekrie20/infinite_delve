@@ -4,6 +4,8 @@ import { monsterForDepth, type IdleGains, type MonsterKind } from '../../shared/
 import { TUNING } from '../../shared/content/tuning';
 import { itemName, rollDrop, sellValue } from '../../shared/content/items';
 import { bankHaul, deriveStats, equipItem, sellItem, unequipSlot } from '../../shared/content/gear';
+import { STATS, type StatId } from '../../shared/content/stats';
+import { HANDLERS, type HandlerResult } from '../../shared/content/handlers';
 import { postEquip, postRunResult, postSell } from '../api';
 
 /** The side-view idle combat lane. Auto-battles down through depths (one monster
@@ -57,22 +59,88 @@ interface Combatant {
   maxHp: number;
   attack: number;
   defense: number;
-  /** Crit chance, whole percent. */
+  /** Derived crit chance (whole %). */
   critChance: number;
-  /** Lifesteal, whole percent of damage dealt (heroes only; 0 for monsters). */
+  /** Derived crit multiplier (1.5 base). */
+  critMultiplier: number;
+  /** Derived lifesteal (whole %). */
   lifesteal: number;
+  /** Derived dodge chance (whole %). */
+  dodge: number;
+  /** Derived HP/sec regen. */
+  hpRegen: number;
+  /** Derived % bonus gold from kills. */
+  goldFind: number;
+}
+
+/** Build a hero Combatant from the client-side Hero (pre-computed derives). */
+function heroCombatant(h: Hero): Combatant {
+  return {
+    hp: h.maxHp, maxHp: h.maxHp,
+    attack: h.attack, defense: h.defense,
+    critChance: h.critChance, critMultiplier: h.critMultiplier,
+    lifesteal: h.lifesteal, dodge: h.dodge,
+    hpRegen: h.hpRegen, goldFind: h.goldFind,
+  };
+}
+
+/** Collect all `implemented: true` behavioral stats from a DerivedMap,
+ *  grouped by hook point. Called whenever the hero's gear changes. */
+function behavioralStats(d: Record<string, number>): Record<string, Array<{ stat: StatId; val: number }>> {
+  const groups: Record<string, Array<{ stat: StatId; val: number }>> = {
+    onCombatStart: [], onAttack: [], onCrit: [],
+    onDealDamage: [], onTakeDamage: [], onKill: [], perTick: [],
+  };
+  for (const id of Object.keys(STATS) as StatId[]) {
+    const def = STATS[id];
+    if (def.kind !== 'behavioral' || !def.hook || !def.handler || def.implemented === false) continue;
+    const val = d[def.target] ?? 0;
+    if (val > 0) groups[def.hook]!.push({ stat: id, val });
+  }
+  return groups;
+}
+
+/** Dispatch one hook point across all equipped behavioral stats. Accumulates results. */
+function dispatchHook(
+  hook: string,
+  groups: Record<string, Array<{ stat: StatId; val: number }>>,
+  dmg: number,
+  hero: Combatant,
+  monster: Combatant,
+): HandlerResult {
+  const out: HandlerResult = {};
+  for (const { stat, val } of groups[hook] ?? []) {
+    const fn = HANDLERS[STATS[stat].handler!];
+    if (!fn) continue;
+    const r = fn(dmg, val, hero, monster);
+    if (r.heal) hero.hp = Math.min(hero.maxHp, hero.hp + r.heal);
+    if (r.shield) out.shield = (out.shield ?? 0) + r.shield;
+    if (r.reflect) out.reflect = (out.reflect ?? 0) + r.reflect;
+    if (r.extraDmg) out.extraDmg = (out.extraDmg ?? 0) + r.extraDmg;
+    if (r.bonusGold) out.bonusGold = (out.bonusGold ?? 0) + r.bonusGold;
+    if (r.dodged) out.dodged = true;
+    if (r.blocked) out.blocked = true;
+    if (r.blockedBy) out.blockedBy = r.blockedBy;
+    if (r.counterDmg) out.counterDmg = (out.counterDmg ?? 0) + r.counterDmg;
+    if (r.dead) out.dead = true;
+    if (r.regen) out.regen = (out.regen ?? 0) + r.regen;
+  }
+  return out;
 }
 
 export class LaneScene extends Phaser.Scene {
   private hero!: Hero;
   private heroC!: Combatant;
   private monster!: Combatant;
-  private depth = 1; // depth of the monster currently being fought (1-indexed)
-  private runGold = 0; // local preview; server is authoritative on extract
-  private runHaul: GearItem[] = []; // gear found this run — unbanked, lost on death
+  private heroDerived!: Record<string, number>;
+  private heroBehaviors!: ReturnType<typeof behavioralStats>;
+  private depth = 1;
+  private runGold = 0;
+  private runHaul: GearItem[] = [];
   private bankedGold = 0;
   private pendingIdle?: IdleGains;
   private over = false;
+  private tickAccum = 0;
 
   private heroSprite!: Phaser.GameObjects.Image;
   private monsterSprite!: Phaser.GameObjects.Image;
@@ -90,16 +158,16 @@ export class LaneScene extends Phaser.Scene {
   init(data: { hero?: Hero; idle?: IdleGains }): void {
     this.hero = data.hero ?? {
       class: 'squire', level: 1, xp: 0, xpToNext: 20, hp: 40, maxHp: 40,
-      attack: 6, defense: 5, critChance: TUNING.combat.critChance * 100, lifesteal: 0,
-      gold: 0, bestDepth: 1, stash: [], equipped: {},
+      attack: 6, defense: 5, critChance: TUNING.combat.critChance * 100,
+      critMultiplier: TUNING.combat.critMultiplier, lifesteal: 0, dodge: 0,
+      hpRegen: 0, goldFind: 0, gold: 0, bestDepth: 1, stash: [], equipped: {},
     };
     if (data.idle) this.pendingIdle = data.idle;
     this.bankedGold = this.hero.gold;
-    this.heroC = {
-      hp: this.hero.maxHp, maxHp: this.hero.maxHp,
-      attack: this.hero.attack, defense: this.hero.defense,
-      critChance: this.hero.critChance, lifesteal: this.hero.lifesteal,
-    };
+    this.heroC = heroCombatant(this.hero);
+    this.heroDerived = deriveStats(this.hero.class, this.hero.level, this.hero.equipped);
+    this.heroBehaviors = behavioralStats(this.heroDerived);
+    this.tickAccum = 0;
   }
 
   preload(): void {
@@ -165,12 +233,33 @@ export class LaneScene extends Phaser.Scene {
 
   override update(_time: number, delta: number): void {
     if (this.over) return;
+
+    // perTick: HP regen accumulates every frame
+    this.tickAccum += delta;
+    if (this.tickAccum >= 1000) {
+      this.tickAccum -= 1000;
+      const tick = dispatchHook('perTick', this.heroBehaviors, 0, this.heroC, this.monster);
+      if (tick.regen && this.heroC.hp > 0 && this.heroC.hp < this.heroC.maxHp) {
+        this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + tick.regen);
+      }
+    }
+
     this.attackTimer -= delta;
     if (this.attackTimer > 0) return;
     this.attackTimer = ATTACK_INTERVAL_MS;
 
-    // Hero strikes the monster (crit from the hero's derived critChance stat).
-    const hit = rollDamage(this.heroC.attack, this.monster.defense, this.heroC.critChance);
+    // ── Hero attacks the monster ──
+    // onAttack: execute, double-strike, armor-pierce, accuracy
+    const onAtk = dispatchHook('onAttack', this.heroBehaviors, 0, this.heroC, this.monster);
+    if (onAtk.dead) {
+      this.monster.hp = 0;
+      this.onMonsterDead();
+      this.refreshHud();
+      return;
+    }
+    const effectiveAtk = this.heroC.attack + (onAtk.extraDmg ?? 0);
+
+    const hit = rollDamage(effectiveAtk, this.monster.defense, this.heroC.critChance, this.heroC.critMultiplier);
     this.monster.hp -= hit.dmg;
     this.hitFx(this.heroSprite, 1);
     this.floatNumber(
@@ -178,12 +267,29 @@ export class LaneScene extends Phaser.Scene {
       hit.crit ? `${hit.dmg}!` : `${hit.dmg}`, hit.crit ? '#ffd84a' : '#ffffff'
     );
 
-    // Lifesteal — recover a slice of damage dealt (behavioral stat hook).
-    if (this.heroC.lifesteal > 0 && this.heroC.hp < this.heroC.maxHp) {
-      const leech = Math.round((hit.dmg * this.heroC.lifesteal) / 100);
-      if (leech > 0) {
-        this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + leech);
-        this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `+${leech}`, '#7fe0a0');
+    // onCrit: burst AoE, crit heal
+    if (hit.crit) {
+      const onCrit = dispatchHook('onCrit', this.heroBehaviors, hit.dmg, this.heroC, this.monster);
+      if (onCrit.heal && this.heroC.hp < this.heroC.maxHp) {
+        this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onCrit.heal);
+        this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `+${onCrit.heal}`, '#7fe0a0');
+      }
+    }
+
+    // onDealDamage: lifesteal, mana leech, shield leech, cleave
+    const onDmg = dispatchHook('onDealDamage', this.heroBehaviors, hit.dmg, this.heroC, this.monster);
+    if (onDmg.heal && this.heroC.hp < this.heroC.maxHp) {
+      this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onDmg.heal);
+      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `+${onDmg.heal}`, '#7fe0a0');
+    }
+
+    // double-strike: repeat the attack (signalled by extraDmg = -1)
+    if (onAtk.extraDmg === -1 && this.monster.hp > 0) {
+      const hit2 = rollDamage(effectiveAtk, this.monster.defense, this.heroC.critChance, this.heroC.critMultiplier);
+      this.monster.hp -= hit2.dmg;
+      const onDmg2 = dispatchHook('onDealDamage', this.heroBehaviors, hit2.dmg, this.heroC, this.monster);
+      if (onDmg2.heal && this.heroC.hp < this.heroC.maxHp) {
+        this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onDmg2.heal);
       }
     }
 
@@ -193,20 +299,56 @@ export class LaneScene extends Phaser.Scene {
       return;
     }
 
-    // The monster strikes back.
-    const back = rollDamage(this.monster.attack, this.heroC.defense, this.monster.critChance);
-    this.heroC.hp -= back.dmg;
-    this.hitFx(this.monsterSprite, -1);
-    this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `${back.dmg}`, '#ff6b6b');
+    // ── Monster strikes back ──
+    let backDmg = this.monster.attack * (1 - this.heroC.defense / 100);
+    backDmg *= 1 - TUNING.combat.damageVariance + Math.random() * (2 * TUNING.combat.damageVariance);
+    backDmg = Math.max(1, Math.round(backDmg));
 
-    if (this.heroC.hp <= 0) this.die();
+    // onTakeDamage: dodge, thorns, block, counter-attack
+    const onTaken = dispatchHook('onTakeDamage', this.heroBehaviors, backDmg, this.heroC, this.monster);
+    if (onTaken.dodged) {
+      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, 'DODGE', '#ffe066');
+      if (onTaken.counterDmg) {
+        this.monster.hp -= onTaken.counterDmg;
+        this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, `${onTaken.counterDmg}`, '#ffd84a');
+      }
+    } else {
+      this.heroC.hp -= backDmg;
+      this.hitFx(this.monsterSprite, -1);
+      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `${backDmg}`, '#ff6b6b');
+      if (onTaken.reflect && this.monster.hp > 0) {
+        this.monster.hp -= onTaken.reflect;
+        this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, `${onTaken.reflect}`, '#ffd84a');
+      }
+    }
+
+    if (this.heroC.hp <= 0) {
+      // Last-chance: revive
+      const onLethal = dispatchHook('onTakeDamage', this.heroBehaviors, backDmg, this.heroC, this.monster);
+      if (onLethal.heal) {
+        this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onLethal.heal);
+        this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, 'REVIVED!', '#ffe066');
+      } else {
+        this.die();
+      }
+    }
     this.refreshHud();
   }
 
   private onMonsterDead(): void {
     const m = monsterForDepth(this.depth);
-    this.runGold += m.gold;
-    this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, `+${m.gold}◆`, '#ffe066');
+
+    // onKill: heal on kill, explode, gold find, XP bonus
+    const onKill = dispatchHook('onKill', this.heroBehaviors, m.hp, this.heroC, this.monster);
+    if (onKill.heal && this.heroC.hp < this.heroC.maxHp) {
+      this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onKill.heal);
+      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `+${onKill.heal}`, '#5bd06a');
+    }
+
+    const goldMult = 1 + (onKill.bonusGold ?? 0) / 100;
+    const totalGold = Math.round(m.gold * goldMult);
+    this.runGold += totalGold;
+    this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, `+${totalGold}◆`, '#ffe066');
 
     // Loot roll — unbanked haul the EXTRACT decision protects (lost on death).
     const drop = rollDrop(this.depth, m.kind === 'swarm', Math.random);
@@ -215,14 +357,7 @@ export class LaneScene extends Phaser.Scene {
       this.dropToast(drop);
     }
 
-    // Heal-on-kill — recover a slice of HP so runs breathe toward a deep wall.
-    const heal = Math.round(this.heroC.maxHp * TUNING.combat.healOnKillPct);
-    if (heal > 0 && this.heroC.hp < this.heroC.maxHp) {
-      this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + heal);
-      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `+${heal}`, '#5bd06a');
-    }
-
-    this.depth += 1; // auto-advance deeper (idle)
+    this.depth += 1;
     this.spawnMonster();
   }
 
@@ -292,12 +427,10 @@ export class LaneScene extends Phaser.Scene {
 
   /** Push the hero's derived stats into the live combatant (after gear/level change). */
   private syncHeroStats(): void {
-    this.heroC.maxHp = this.hero.maxHp;
-    this.heroC.attack = this.hero.attack;
-    this.heroC.defense = this.hero.defense;
-    this.heroC.critChance = this.hero.critChance;
-    this.heroC.lifesteal = this.hero.lifesteal;
-    if (this.heroC.hp > this.heroC.maxHp) this.heroC.hp = this.heroC.maxHp;
+    this.heroC = heroCombatant(this.hero);
+    this.heroDerived = deriveStats(this.hero.class, this.hero.level, this.hero.equipped);
+    this.heroBehaviors = behavioralStats(this.heroDerived);
+    this.heroC.hp = Math.min(this.heroC.hp, this.heroC.maxHp);
   }
 
   /** Recompute the hero's derived stats from class + level + gear (offline path). */
@@ -307,8 +440,14 @@ export class LaneScene extends Phaser.Scene {
     this.hero.attack = d.attack;
     this.hero.defense = d.defensePct;
     this.hero.critChance = d.critChance;
+    this.hero.critMultiplier = d.critMultiplier;
     this.hero.lifesteal = d.lifestealPct;
+    this.hero.dodge = d.dodgeChance;
+    this.hero.hpRegen = d.hpRegen;
+    this.hero.goldFind = d.goldFindPct;
     if (this.hero.hp > this.hero.maxHp) this.hero.hp = this.hero.maxHp;
+    this.heroDerived = d;
+    this.heroBehaviors = behavioralStats(d);
   }
 
   /** Equip a stash item or unequip a slot — server-authoritative, or local when
@@ -346,7 +485,8 @@ export class LaneScene extends Phaser.Scene {
     const m = monsterForDepth(this.depth);
     this.monster = {
       hp: m.hp, maxHp: m.hp, attack: m.attack, defense: m.defense,
-      critChance: TUNING.combat.critChance * 100, lifesteal: 0,
+      critChance: TUNING.combat.critChance * 100, critMultiplier: TUNING.combat.critMultiplier,
+      lifesteal: 0, dodge: 0, hpRegen: 0, goldFind: 0,
     };
     const spec = MONSTER_SPECS[m.kind];
     this.monsterSpec = spec;
@@ -475,18 +615,18 @@ export class LaneScene extends Phaser.Scene {
   }
 }
 
-/** Damage = attack * (1 - defense%), ± variance, crit chance × mult, min 1.
- *  `critChancePct` is the attacker's whole-percent crit chance (base + gear);
- *  other knobs from TUNING.combat. Returns the rolled damage and whether it crit. */
+/** Damage = attack * (1 - defense%), ± variance, crit chance × multiplier, min 1.
+ *  `critChancePct` and `critMult` come from the attacker's derived stats (hero uses
+ *  PoE-style base × increased; monster uses TUNING defaults). */
 function rollDamage(
   attack: number,
   defensePct: number,
-  critChancePct: number = TUNING.combat.critChance * 100
+  critChancePct: number = TUNING.combat.critChance * 100,
+  critMult: number = TUNING.combat.critMultiplier,
 ): { dmg: number; crit: boolean } {
-  const c = TUNING.combat;
   let dmg = attack * (1 - defensePct / 100);
-  dmg *= 1 - c.damageVariance + Math.random() * (2 * c.damageVariance);
+  dmg *= 1 - TUNING.combat.damageVariance + Math.random() * (2 * TUNING.combat.damageVariance);
   const crit = Math.random() < critChancePct / 100;
-  if (crit) dmg *= c.critMultiplier;
+  if (crit) dmg *= critMult;
   return { dmg: Math.max(1, Math.round(dmg)), crit };
 }

@@ -62,10 +62,18 @@ export interface Hero {
   attack: number;
   /** Derived percent damage reduction, 0..100. */
   defense: number;
-  /** Derived total crit chance, whole percent (innate base + gear/set). */
+  /** Derived total crit chance, whole percent (PoE: base × (1 + increased/100)). */
   critChance: number;
+  /** Derived crit damage multiplier (1.5 base, gear can push to ~2.5). */
+  critMultiplier: number;
   /** Derived total lifesteal, whole percent of damage dealt (gear/set). */
   lifesteal: number;
+  /** Derived dodge chance, whole percent. */
+  dodge: number;
+  /** Derived HP regen per second. */
+  hpRegen: number;
+  /** Derived bonus gold from kills, whole percent. */
+  goldFind: number;
   gold: number;
   /** Deepest depth ever banked (via extract). Drives the idle income rate. */
   bestDepth: number;

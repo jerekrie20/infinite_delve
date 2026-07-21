@@ -45,6 +45,13 @@ function migrateItem(raw: Record<string, unknown>): GearItem | null {
   const r = (raw.r ?? raw.rarity ?? 'common') as GearItem['r'];
   // Old key `stats` → new key `s`; new key wins if both present.
   const s = (raw.s ?? raw.stats ?? {}) as GearItem['s'];
+  // Old stat `critChance` → `increasedCritPct` (crit rework: additive → PoE model).
+  // Old items with +crit become "+% increased crit chance" so they still work.
+  const so = s as Record<string, number | undefined>;
+  if (so.critChance != null && so.increasedCritPct == null) {
+    so.increasedCritPct = so.critChance;
+    delete so.critChance;
+  }
   return {
     id: raw.id as string,
     slot: raw.slot as GearSlot,
@@ -123,7 +130,11 @@ export function toHero(h: StoredHero): Hero {
     attack: d.attack,
     defense: d.defensePct,
     critChance: d.critChance,
+    critMultiplier: d.critMultiplier,
     lifesteal: d.lifestealPct,
+    dodge: d.dodgeChance,
+    hpRegen: d.hpRegen,
+    goldFind: d.goldFindPct,
     gold: h.gold,
     bestDepth: h.bestDepth,
     stash: h.stash,

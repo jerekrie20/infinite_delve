@@ -211,7 +211,11 @@ function render(): void {
       `<span>❤️ ${hero.maxHp}</span>` +
       `<span>🛡️ ${hero.defense}%</span>` +
       `<span>🎯 ${hero.critChance}%</span>` +
+      (hero.critMultiplier > 1.5 ? `<span>💥 ×${hero.critMultiplier.toFixed(1)}</span>` : '') +
       (hero.lifesteal > 0 ? `<span>🩸 ${hero.lifesteal}%</span>` : '') +
+      (hero.dodge > 0 ? `<span>🌀 ${hero.dodge}%</span>` : '') +
+      (hero.hpRegen > 0 ? `<span>💚 ${hero.hpRegen}/s</span>` : '') +
+      (hero.goldFind > 0 ? `<span>💰 +${hero.goldFind}%</span>` : '') +
       `<span>◆ ${hero.gold}</span>` +
       `</div>`
   );
