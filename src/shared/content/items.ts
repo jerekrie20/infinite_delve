@@ -7,8 +7,23 @@
 import type { GearItem, GearSlot, GearStats, Rarity } from '../delve';
 import { TUNING } from './tuning';
 import { STATS, STAT_IDS, isImplemented, type StatId } from './stats';
-import { SET_BY_BASE, SETS } from './sets';
+import { SET_BY_BASE, SETS, type SetItemDef } from './sets';
 import { UNIQUES, UNIQUE_BY_ID, type UniqueItem } from './uniques';
+
+/** Flat index of every set-item across all sets, for `pick()` during set drops. */
+interface SetDropEntry { set: string; rarity: Rarity; item: SetItemDef }
+const ALL_SET_ITEMS: SetDropEntry[] = (() => {
+  const out: SetDropEntry[] = [];
+  for (const s of Object.values(SETS)) {
+    for (const itm of s.items) out.push({ set: s.id, rarity: s.rarity, item: itm });
+  }
+  return out;
+})();
+
+/** Fast lookup of set-item ids for name rebuild. */
+const SET_ITEM_BY_ID: Record<string, SetItemDef> = Object.fromEntries(
+  ALL_SET_ITEMS.map((e) => [e.item.id, e.item])
+);
 
 /** A 0..1 random source (defaults to Math.random; tests pass a seeded one). */
 export type Rng = () => number;
@@ -38,12 +53,15 @@ export const RARITY_BY_ID: Record<Rarity, RarityTier> = Object.fromEntries(
 
 /** Rebuild the display name from the item's data (NO stored `name` field — saves
  *  bytes in Redis across ~36 items per hero). Uniques carry their own title;
- *  everything else is "{Rarity} {Base}" (e.g. "Rare Blade"). */
+ *  set items use the set-item def name; everything else is "{Rarity} {Base}". */
 export function itemName(it: GearItem): string {
   if (it.unique) {
     const u = UNIQUE_BY_ID[it.unique];
     if (u) return u.name;
   }
+  // Set items have their own display name (e.g. "Warden Plate").
+  const si = SET_ITEM_BY_ID[it.base];
+  if (si) return si.name;
   const rarityName = RARITY_BY_ID[it.r]?.name ?? it.r;
   const baseName = BASE_BY_ID[it.base]?.name ?? it.base;
   return `${rarityName} ${baseName}`;
@@ -70,14 +88,22 @@ export interface BaseItem {
 export const BASES: BaseItem[] = [
   { id: 'blade', name: 'Blade', slot: 'hand1', primary: 'attack',
     pool: ['attackPct', 'maxHp', 'increasedCritPct', 'lifestealPct', 'baseCritChance', 'critMultiplier'] },
+  { id: 'shield', name: 'Shield', slot: 'hand2', primary: 'defensePct',
+    pool: ['maxHp', 'maxHpPct', 'blockChance', 'blockAmount', 'thornsPct', 'hpRegen', 'damageReductionPct'] },
   { id: 'armor', name: 'Armor', slot: 'body', primary: 'maxHp',
     pool: ['maxHpPct', 'defensePct', 'increasedCritPct', 'thornsPct', 'hpRegen'] },
   { id: 'helm', name: 'Helm', slot: 'head', primary: 'maxHp',
     pool: ['maxHpPct', 'defensePct', 'attack', 'increasedCritPct', 'hpRegen'] },
+  { id: 'greaves', name: 'Greaves', slot: 'legs', primary: 'maxHp',
+    pool: ['maxHpPct', 'defensePct', 'dodgeChance', 'hpRegen', 'hpRegenPct', 'damageReductionPct'] },
   { id: 'boots', name: 'Boots', slot: 'feet', primary: 'defensePct',
     pool: ['maxHp', 'maxHpPct', 'dodgeChance', 'hpRegen', 'goldFindPct'] },
+  { id: 'belt', name: 'Belt', slot: 'belt', primary: 'maxHp',
+    pool: ['hpRegen', 'hpRegenPct', 'goldFindPct', 'healOnKillPct', 'maxHpPct', 'dodgeChance'] },
   { id: 'ring', name: 'Ring', slot: 'ring1', primary: 'attack',
     pool: ['attackPct', 'increasedCritPct', 'lifestealPct', 'maxHp', 'baseCritChance', 'critMultiplier', 'goldFindPct'] },
+  { id: 'band', name: 'Band', slot: 'ring2', primary: 'attack',
+    pool: ['attackPct', 'increasedCritPct', 'lifestealPct', 'baseCritChance', 'critMultiplier', 'goldFindPct'] },
   { id: 'amulet', name: 'Amulet', slot: 'amulet', primary: 'maxHp',
     pool: ['attackPct', 'maxHpPct', 'increasedCritPct', 'lifestealPct', 'hpRegen', 'goldFindPct', 'damageReductionPct'] },
 ];
@@ -195,20 +221,39 @@ export function rollGear(depth: number, rng: Rng = Math.random): GearItem {
   if (unique) return unique;
 
   const it = TUNING.items;
-  const base = pick(BASES, rng);
-  // A set-member base drops as a set item only some of the time (scaling with
-  // depth); otherwise it rolls a normal depth-weighted rarity.
-  const memberSet = SET_BY_BASE[base.id];
-  const setId = memberSet && rng() < setChanceAt(d) ? memberSet : undefined;
-  const rarity = setId ? RARITY_BY_ID[SETS[setId]!.rarity] : rollRarity(d, rng);
-  const budget = (it.budgetBase + d * it.budgetPerDepth) * rarity.statMult;
 
+  // Set drop: pick from all set-items across all sets (depth-scaled chance).
+  if (ALL_SET_ITEMS.length && rng() < setChanceAt(d)) {
+    const entry = pick(ALL_SET_ITEMS, rng);
+    const sRarity = RARITY_BY_ID[entry.rarity];
+    const sBudget = (it.budgetBase + d * it.budgetPerDepth) * sRarity.statMult;
+    const stats: GearStats = { [entry.item.primary]: statValue(sBudget, entry.item.primary) };
+    const sPool = entry.item.pool.filter(isImplemented);
+    const sAffixes = pickN(sPool, AFFIXES_BY_RARITY[sRarity.id], rng);
+    for (const stat of sAffixes) {
+      stats[stat] = (stats[stat] ?? 0) + affixValue(stat, sBudget * it.affixBudgetFrac, sRarity.statMult, rng);
+    }
+    return {
+      id: newId(rng),
+      slot: entry.item.slot,
+      r: sRarity.id,
+      base: entry.item.id,
+      set: entry.set,
+      s: stats,
+    };
+  }
+
+  // Generic drop: pick a base, roll rarity, generate.
+  const base = pick(BASES, rng);
+  const rarity = rollRarity(d, rng);
+  const budget = (it.budgetBase + d * it.budgetPerDepth) * rarity.statMult;
   const stats: GearStats = { [base.primary]: statValue(budget, base.primary) };
-  const pool = base.pool.filter(isImplemented); // never roll a staged (unimplemented) stat
+  const pool = base.pool.filter(isImplemented);
   const affixes = pickN(pool, AFFIXES_BY_RARITY[rarity.id], rng);
   for (const stat of affixes) {
     stats[stat] = (stats[stat] ?? 0) + affixValue(stat, budget * it.affixBudgetFrac, rarity.statMult, rng);
   }
+  const setId = SET_BY_BASE[base.id];
   return {
     id: newId(rng),
     slot: base.slot,
@@ -239,7 +284,7 @@ export function sellValue(item: GearItem): number {
   return Math.max(1, Math.round(gearScore(item) * TUNING.items.sellValueMult));
 }
 
-export const VALID_SLOTS: GearSlot[] = ['head', 'body', 'hand1', 'hand2', 'legs', 'feet', 'ring1', 'ring2', 'amulet'];
+export const VALID_SLOTS: GearSlot[] = ['head', 'body', 'hand1', 'hand2', 'legs', 'feet', 'ring1', 'ring2', 'amulet', 'belt'];
 const VALID_RARITIES: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
 const safeId = (v: unknown): string =>
@@ -302,12 +347,11 @@ export function sanitizeGearItem(raw: unknown, depth: number): GearItem | null {
     if (v > 0) stats[id] = v;
   }
   if (STAT_IDS.every((id) => stats[id] === undefined)) return null;
-  // Base: trust the claim only if it matches the slot, else the slot's canonical
-  // base. Set + rarity are then derived from the base (set members drop at their
-  // set's tier), never trusted from the client.
-  const claimed = BASE_BY_ID[o.base as string];
-  const base = claimed && claimed.slot === slot ? claimed : BASE_BY_SLOT[slot];
-  const baseId = base?.id ?? 'blade';
+  // Base: trust the claim only if it matches the slot (from bases OR set-items),
+  // else the slot's canonical generic base. Set + rarity are then derived from
+  // the authoritative data, never trusted from the client.
+  const claimed = (BASE_BY_ID[o.base as string] ?? SET_ITEM_BY_ID[o.base as string]) as { slot: GearSlot; id: string } | undefined;
+  const baseId = (claimed && claimed.slot === slot ? claimed.id : BASE_BY_SLOT[slot]?.id) ?? 'blade';
   const setId = SET_BY_BASE[baseId];
   const rarity = setId ? SETS[setId]!.rarity : claimedRarity;
   return {

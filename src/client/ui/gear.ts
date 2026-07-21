@@ -30,10 +30,14 @@ const UNIQUE_COLOR = '#ff8a3d';
 /** Equip slots shown, in display order (icon = sprite stand-in until art lands). */
 const SLOTS: Array<{ slot: GearSlot; label: string; icon: string }> = [
   { slot: 'hand1', label: 'Weapon', icon: '⚔️' },
-  { slot: 'body', label: 'Armor', icon: '👕' },
-  { slot: 'head', label: 'Helm', icon: '⛑️' },
-  { slot: 'feet', label: 'Boots', icon: '🥾' },
+  { slot: 'hand2', label: 'Off-hand', icon: '🛡️' },
+  { slot: 'body',  label: 'Armor', icon: '👕' },
+  { slot: 'head',  label: 'Helm', icon: '⛑️' },
+  { slot: 'legs',  label: 'Legs', icon: '👖' },
+  { slot: 'feet',  label: 'Boots', icon: '🥾' },
+  { slot: 'belt',  label: 'Belt', icon: '🎗️' },
   { slot: 'ring1', label: 'Ring', icon: '💍' },
+  { slot: 'ring2', label: 'Ring 2', icon: '💍' },
   { slot: 'amulet', label: 'Amulet', icon: '📿' },
 ];
 const SLOT_META: Partial<Record<GearSlot, { label: string; icon: string }>> = Object.fromEntries(

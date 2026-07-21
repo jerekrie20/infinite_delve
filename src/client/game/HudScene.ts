@@ -22,7 +22,7 @@ export interface HudHooks {
 const DEFAULT_SLICE: Slice = { left: 8, top: 8, right: 8, bottom: 8 };
 
 /** Six real equip slots shown inline + two locked placeholders = 8-cell grid. */
-const GEAR_SLOTS: GearSlot[] = ['hand1', 'body', 'head', 'feet', 'ring1', 'amulet'];
+const GEAR_SLOTS: GearSlot[] = ['hand1', 'hand2', 'body', 'head', 'legs', 'feet', 'belt', 'ring1', 'ring2', 'amulet'];
 const RARITY_HEX: Record<string, number> = {
   common: 0xc8c8c8, uncommon: 0x5bd06a, rare: 0x4aa3ff, epic: 0xb45bff, legendary: 0xffb020,
 };

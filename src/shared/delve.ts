@@ -18,7 +18,8 @@ export type GearSlot =
   | 'feet'
   | 'ring1'
   | 'ring2'
-  | 'amulet';
+  | 'amulet'
+  | 'belt';
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 

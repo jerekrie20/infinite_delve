@@ -7,151 +7,238 @@
     <style>
       * { box-sizing: border-box; }
       body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #17111f; color: #ece7f5; }
+
+      /* ── header ─────────────────────────────────────────────────── */
       header {
-        display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 14px;
-        background: #1c1430; position: sticky; top: 0; z-index: 5; border-bottom: 1px solid rgba(255,255,255,0.12);
+        display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 10px 14px;
+        background: #1c1430; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid rgba(255,255,255,0.12);
       }
-      header h1 { font-size: 15px; margin: 0 6px 0 0; }
+      header h1 { font-size: 15px; margin: 0 6px 0 0; white-space: nowrap; }
       button {
         padding: 6px 11px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
-        background: rgba(255,255,255,0.08); color: #fff; cursor: pointer; font-size: 13px;
+        background: rgba(255,255,255,0.08); color: #fff; cursor: pointer; font-size: 15px; white-space: nowrap;
       }
       button:hover { background: rgba(255,255,255,0.16); }
       button.primary { background: #37b04f; border-color: #37b04f; font-weight: bold; }
-      button.mini { padding: 2px 8px; font-size: 12px; }
-      .tabs { display: flex; gap: 4px; }
-      .tab { background: rgba(255,255,255,0.05); }
+      button.mini { padding: 2px 8px; font-size: 15px; }
+      .tabs { display: flex; gap: 3px; flex-wrap: wrap; }
+      .tab { background: rgba(255,255,255,0.05); font-size: 15px; }
       .tab.active { background: #4aa3ff; border-color: #4aa3ff; font-weight: bold; }
-      #status { font-size: 12px; color: #9d8fc0; margin-left: auto; }
+      #status { font-size: 15px; color: #9d8fc0; margin-left: auto; }
       #status.err { color: #ff6b6b; }
-      main { padding: 14px; }
+
+      /* ── two-column layout ──────────────────────────────────────── */
+      .layout { display: grid; grid-template-columns: 1fr 420px; height: calc(100vh - 50px); overflow: hidden; }
+      .left  { overflow-y: auto; padding: 14px 10px 14px 16px; }
+      .right { overflow-y: auto; padding: 14px 16px 14px 10px; border-left: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.15); position: sticky; top: 0; height: calc(100vh - 50px); }
+      .right h2 { font-size: 15px; color: #9d8fc0; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+      textarea {
+        width: 100%; background: #0c0812; color: #b7e5c2; border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 8px; padding: 8px; font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 15px; white-space: pre; resize: vertical; margin-bottom: 14px;
+      }
+      .ts-block { margin-bottom: 4px; }
+      .ts-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+      .ts-head strong { font-size: 15px; }
+
+      /* ── cards & sections ───────────────────────────────────────── */
       .page { display: none; } .page.active { display: block; }
-      .hint { font-size: 12px; color: #9d8fc0; margin: 0 0 12px; max-width: 900px; line-height: 1.5; }
+      .hint { font-size: 15px; color: #9d8fc0; margin: 0 0 10px; line-height: 1.5; }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-bottom: 10px; }
+      .slot-filter { display: flex; flex-wrap: wrap; gap: 3px; }
+      .slot-pill {
+        padding: 3px 8px; border-radius: 10px; font-size: 15px; cursor: pointer; user-select: none;
+        border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); color: #9d8fc0;
+      }
+      .slot-pill.on { background: rgba(74,163,255,0.2); border-color: rgba(74,163,255,0.4); color: #fff; }
+      .slot-pill .ct { opacity: 0.6; margin-left: 2px; }
+      input.search { width: 180px; padding: 5px 8px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.2); background: #120c1c; color: #fff; font-size: 15px; }
+
+      .section { margin-bottom: 14px; }
+      .section-head { font-size: 15px; font-weight: bold; color: #9d8fc0; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+      .section-head .ct { font-size: 15px; opacity: 0.6; font-weight: normal; }
+
       .card {
         background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 12px; padding: 12px; margin-bottom: 10px; max-width: 900px;
+        border-radius: 10px; padding: 10px 12px; margin-bottom: 6px;
       }
       .card.bad { border-color: #ff6b6b; }
-      .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-      .card-head .title { font-weight: bold; font-size: 14px; }
-      .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin-bottom: 8px; }
-      label { font-size: 11px; color: #cbc3dd; display: flex; flex-direction: column; gap: 3px; }
-      label.inline { flex-direction: row; align-items: center; gap: 5px; }
+      .card-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+      .card-head .title { font-weight: bold; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+      .card-body { margin-top: 8px; display: none; }
+      .card.open .card-body { display: block; }
+      .card-toggle { font-size: 15px; color: #6d5f90; margin-right: 4px; transition: transform 0.15s; display: inline-block; }
+      .card.open .card-toggle { transform: rotate(90deg); }
+      .row { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: flex-end; margin-bottom: 4px; }
+      label { font-size: 15px; color: #cbc3dd; display: flex; flex-direction: column; gap: 2px; }
+      label.inline { flex-direction: row; align-items: center; gap: 4px; font-size: 15px; }
       input, select {
-        padding: 5px 8px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.2);
-        background: #120c1c; color: #fff; font-size: 13px;
+        padding: 4px 7px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2);
+        background: #120c1c; color: #fff; font-size: 15px;
       }
-      input.id { width: 110px; } input.name { width: 150px; } input.num { width: 62px; }
-      .pool { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; }
-      .pool label { flex-direction: row; align-items: center; gap: 4px; font-size: 12px; }
-      .pill { font-size: 11px; color: #9d8fc0; font-weight: normal; }
-      .badge { font-size: 10px; padding: 1px 5px; border-radius: 6px; background: rgba(255,180,60,0.2); color: #ffb84d; }
-      .line-row { display: flex; gap: 8px; align-items: center; margin-bottom: 5px; }
-      .err-lines { color: #ff9b9b; font-size: 11px; margin-top: 6px; white-space: pre-wrap; }
-      details { margin-top: 16px; max-width: 900px; } summary { cursor: pointer; color: #9d8fc0; font-size: 13px; }
-      .out-block { margin-top: 10px; }
-      .out-block .row { margin-bottom: 4px; }
-      textarea {
-        width: 100%; height: 200px; background: #0c0812; color: #b7e5c2;
-        border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px;
-        font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; white-space: pre;
+      input.id { width: 100px; } input.name { width: 140px; } input.num { width: 56px; }
+
+      .pill { font-size: 15px; color: #9d8fc0; font-weight: normal; }
+      .pill.warn { color: #ffb84d; }
+      .badge { font-size: 15px; padding: 1px 5px; border-radius: 5px; background: rgba(255,180,60,0.2); color: #ffb84d; }
+      .badge.ok { background: rgba(90,200,100,0.2); color: #5bd06a; }
+      .line-row { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+      .err-lines { color: #ff9b9b; font-size: 15px; margin-top: 5px; white-space: pre-wrap; }
+      .info-lines { color: #ffb84d; font-size: 15px; margin-top: 5px; white-space: pre-wrap; }
+
+      /* pool pills */
+      .pool-section { margin-top: 4px; }
+      .pool-cat { margin-bottom: 4px; }
+      .pool-cat-name { font-size: 15px; color: #6d5f90; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+      .pool-pills { display: flex; flex-wrap: wrap; gap: 2px; }
+      .stat-pill {
+        display: inline-flex; align-items: center; gap: 1px; padding: 2px 6px; border-radius: 8px;
+        font-size: 15px; cursor: pointer; user-select: none; border: 1px solid transparent; transition: background 0.1s;
       }
+      .stat-pill.off { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.04); color: #5a4f6e; }
+      .stat-pill.on  { background: rgba(74,163,255,0.16); border-color: rgba(74,163,255,0.3); color: #c3dcff; }
+      .stat-pill.on.pct { background: rgba(180,95,255,0.16); border-color: rgba(180,95,255,0.3); color: #dcc3ff; }
+      .stat-pill.on.behv { background: rgba(255,180,60,0.16); border-color: rgba(255,180,60,0.3); color: #ffe0a0; }
+      .stat-pill.primary { background: rgba(90,200,100,0.25); border-color: rgba(90,200,100,0.5); color: #b0ffb0; font-weight: bold; }
+      .stat-pill:hover { border-color: rgba(255,255,255,0.3); }
+      .stat-pill .suf { font-size: 15px; opacity: 0.7; }
+      .pool-empty { font-size: 15px; color: #4a3858; font-style: italic; }
+
+      /* simulator */
+      .sim-result { margin-top: 6px; font-size: 15px; line-height: 1.4; }
+      .sim-result .bar { display: inline-block; height: 12px; margin-right: 3px; border-radius: 2px; vertical-align: middle; }
+      .sim-result td { padding: 1px 10px 1px 0; }
     </style>
   </head>
   <body>
     <header>
       <h1>⚔️ Gear Editor</h1>
-      <div class="tabs">
-        <button class="tab active" data-tab="bases">Bases</button>
-        <button class="tab" data-tab="sets">Sets</button>
-        <button class="tab" data-tab="uniques">Uniques</button>
-        <button class="tab" data-tab="stats">Stat catalog</button>
-      </div>
+      <div class="tabs" id="tab-bar"></div>
       <button id="add">+ Add</button>
-      <button id="reset">↺ Reset to committed</button>
-      <button class="primary" id="regen">⟳ Regen TS ↓</button>
+      <button id="reset">↺ Reset</button>
+      <button class="primary" id="regen">⟳ Regen</button>
       <span id="status"></span>
     </header>
 
-    <main>
-      <p class="hint" id="hint"></p>
-      <div class="page active" id="page-bases"></div>
-      <div class="page" id="page-sets"></div>
-      <div class="page" id="page-uniques"></div>
-      <div class="page" id="page-stats"></div>
-
-      <details open>
-        <summary>Generated TS — paste each block over the matching declaration in its content module</summary>
-        <div class="out-block"><div class="row"><strong>items.ts → BASES</strong><button class="mini" data-copy="out-bases">Copy</button></div><textarea id="out-bases" readonly></textarea></div>
-        <div class="out-block"><div class="row"><strong>sets.ts → SETS</strong><button class="mini" data-copy="out-sets">Copy</button></div><textarea id="out-sets" readonly></textarea></div>
-        <div class="out-block"><div class="row"><strong>uniques.ts → UNIQUES</strong><button class="mini" data-copy="out-uniques">Copy</button></div><textarea id="out-uniques" readonly></textarea></div>
-        <div class="out-block"><div class="row"><strong>stats.ts → StatId + STATS</strong><button class="mini" data-copy="out-stats">Copy</button></div><textarea id="out-stats" readonly></textarea></div>
-      </details>
-    </main>
+    <div class="layout">
+      <div class="left">
+        <p class="hint" id="hint"></p>
+        <div class="toolbar" id="toolbar"></div>
+        <div class="page active" id="page-tuning"></div>
+        <div class="page" id="page-bases"></div>
+        <div class="page" id="page-sets"></div>
+        <div class="page" id="page-uniques"></div>
+        <div class="page" id="page-stats"></div>
+      </div>
+      <div class="right" id="right-panel"></div>
+    </div>
 
     <script type="module">
-      import { STATS, STAT_IDS, DERIVED_IDS } from '../src/shared/content/stats.ts';
+      import { STATS, DERIVED_IDS } from '../src/shared/content/stats.ts';
       import { BASES, RARITIES, AFFIXES_BY_RARITY, VALID_SLOTS } from '../src/shared/content/items.ts';
       import { SETS } from '../src/shared/content/sets.ts';
       import { UNIQUES } from '../src/shared/content/uniques.ts';
+      import { TUNING } from '../src/shared/content/tuning.ts';
+      import { HANDLERS } from '../src/shared/content/handlers.ts';
 
-      const LS_KEY = 'delve-gear-editor-v2';
+      const LS_KEY = 'delve-gear-editor-v5';
       const $ = (id) => document.getElementById(id);
       const clone = (v) => JSON.parse(JSON.stringify(v));
       const RARITY_IDS = RARITIES.map((r) => r.id);
       const SNAKE = /^[a-z0-9_]+$/;
+      const HOOK_POINTS = ['onCombatStart','onAttack','onCrit','onDealDamage','onTakeDamage','onKill','perTick'];
+      const HANDLER_NAMES = Object.keys(HANDLERS);
+      const SLOT_COLORS = { hand1:'#ffb84d',hand2:'#8bb8ff',body:'#5bd06a',head:'#4aa3ff',legs:'#c9b8ff',feet:'#c9b8ff',belt:'#ff9b6b',ring1:'#ffd84a',ring2:'#ffd84a',amulet:'#b45bff' };
+      const TAB_NAMES = ['tuning','bases','sets','uniques','stats'];
+
+      const STAT_CATS = [
+        { name:'Core', stats:['attack','attackPct','maxHp','maxHpPct','defensePct','damageReductionPct'] },
+        { name:'Crit',  stats:['baseCritChance','increasedCritPct','critMultiplier'] },
+        { name:'Offense', stats:['lifestealPct','manaLeechPct','critDamageBurst','doubleStrikeChance','cleavePct','executeThreshold','poisonChance','poisonDamage','armorPierce','accuracy'] },
+        { name:'Defense', stats:['dodgeChance','thornsPct','blockChance','blockAmount','counterAttackPct','blockHeal','critHeal','reviveChance','shieldLeechPct','statusResist'] },
+        { name:'Sustain', stats:['healOnKillPct','explodeOnKill','hpRegen','hpRegenPct'] },
+        { name:'Utility', stats:['goldFindPct','xpBonusPct','itemDropChance','rareEnemyChance'] },
+        { name:'Start',  stats:['startingShield','preemptiveStrike'] },
+      ];
 
       const HINTS = {
-        bases: 'Base items = one per drop slot. `primary` always rolls; `pool` is the affix menu (rarity picks how many). Set membership lives on the SET now, not here.',
-        sets: 'A set is defined by its member bases + a rarity (set items drop at that tier, colored green). Bonuses apply cumulatively as thresholds are met.',
-        uniques: 'Named items with signature lines rolled in tight [min,max] bands, a drop weight (weighted entry in the loot table), and an optional set. Render gold.',
-        stats: 'The affix catalog = the stat registry. flat/pct stats work with zero code. A behavioral stat needs a LaneScene hook — author it now, leave "implemented" off, and the roller skips it until the hook is coded.',
+        tuning: 'Tuning knobs. Drop chances scale with depth so deeper runs yield rarer items. Simulator runs live rollGear.',
+        bases: 'Generic drop pool — click pills to build each base\'s affix pool. Bases in the same slot need different pools.',
+        sets: 'Each set owns its items directly. Set items drop at the set\'s rarity (green). Build bonus thresholds below.',
+        uniques: 'Chase items with tight stat bands. dropWeight controls rarity vs other uniques. Render gold ★.',
+        stats: 'Every stat in the game. flat/pct = zero-code. behavioral = needs hook+handler. Flip implemented to go live.',
       };
 
       // ---- state ----------------------------------------------------------
-      // Uniques edit their bands as a `lines:[{stat,min,max}]` array (converted
-      // to/from the {stat:[min,max]} record at seed/serialize time).
       function committed() {
-        return {
-          stats: clone(STATS),
-          bases: clone(BASES),
-          sets: clone(SETS),
-          uniques: UNIQUES.map((u) => ({
-            ...clone(u),
-            lines: Object.entries(u.stats).map(([stat, [min, max]]) => ({ stat, min, max })),
-          })),
-        };
+        const newSets = {};
+        for (const [id, s] of Object.entries(clone(SETS))) {
+          const items = (s.members || []).map((bid) => {
+            const b = BASES.find((x) => x.id === bid);
+            return { id: `s_${id}_${bid}`, name: b ? `${s.name} ${b.name}` : bid, slot: b?.slot ?? 'hand1', primary: b?.primary ?? 'attack', pool: [...(b?.pool ?? [])] };
+          });
+          newSets[id] = { id: s.id, name: s.name, rarity: s.rarity, items, bonuses: clone(s.bonuses || []), ...(s.sprite ? { sprite: s.sprite } : {}) };
+        }
+        return { tuning: clone(TUNING.items), bases: clone(BASES), sets: newSets,
+          uniques: UNIQUES.map((u) => ({ ...clone(u), lines: Object.entries(u.stats).map(([stat, [min, max]]) => ({ stat, min, max })) })),
+          stats: clone(STATS) };
       }
+
       let state;
       try { state = JSON.parse(localStorage.getItem(LS_KEY) || 'null') || committed(); }
       catch { state = committed(); }
-      // Back-fill lines if an older cache lacked them.
-      state.uniques.forEach((u) => { if (!u.lines) u.lines = Object.entries(u.stats || {}).map(([stat, b]) => ({ stat, min: b[0], max: b[1] })); });
+      state.uniques.forEach((u) => { if (!u.lines) u.lines = Object.entries(u.stats || {}).map(([stat, b]) => ({ stat, min: b[0] ?? 0, max: b[1] ?? 0 })); });
+      Object.values(state.stats).forEach((s) => { if (!s.hook) s.hook = ''; if (!s.handler) s.handler = ''; });
+      Object.values(state.sets).forEach((s) => { if (!s.items) s.items = []; });
 
-      let tab = 'bases';
-      const persist = () => localStorage.setItem(LS_KEY, JSON.stringify(state));
+      let tab = 'tuning', cardSearch = '', slotFilter = '', poolSearch = '';
+      // collapsed cards (set of card keys like "base-0", "set-warden")
+      let collapsed = new Set();
+      const persist = () => localStorage.setItem(LS_KEY, JSON.stringify({ ...state, _collapsed: [...collapsed] }));
+      // restore collapsed on load
+      try { const raw = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); if (raw._collapsed) collapsed = new Set(raw._collapsed); } catch {}
 
-      // ---- live vocab (reads STATE so catalog edits propagate) ------------
       const statIds = () => Object.keys(state.stats);
       const flatStatIds = () => statIds().filter((id) => state.stats[id].op === 'flat');
       const isImpl = (id) => state.stats[id] && state.stats[id].implemented !== false;
       const baseIds = () => state.bases.map((b) => b.id);
       const setIds = () => Object.keys(state.sets);
 
-      // ---- validation -----------------------------------------------------
+      // ---- validation / diversity -----------------------------------------
+      function poolOverlap(a, b) { if (!a?.length || !b?.length) return 0; const sb = new Set(b); return a.filter((x) => sb.has(x)).length / Math.max(a.length, b.length); }
+      function diversityNotes() {
+        const notes = [];
+        const bySlot = {};
+        state.bases.forEach((b) => { (bySlot[b.slot] = bySlot[b.slot] || []).push(b); });
+        for (const [slot, bases] of Object.entries(bySlot)) {
+          if (bases.length < 2) continue;
+          for (let i = 0; i < bases.length; i++)
+            for (let j = i + 1; j < bases.length; j++)
+              if (poolOverlap(bases[i].pool, bases[j].pool) > 0.7)
+                notes.push(`${bases[i].id} ↔ ${bases[j].id}: ${Math.round(poolOverlap(bases[i].pool, bases[j].pool) * 100)}% overlap`);
+        }
+        const covered = new Set(Object.keys(bySlot));
+        const missing = VALID_SLOTS.filter((s) => !covered.has(s));
+        if (missing.length) notes.push(`Missing slots: ${missing.join(', ')} (won't drop from generic pool)`);
+        return notes;
+      }
+
       function validate() {
-        const e = { bases: {}, sets: {}, uniques: {}, stats: {} };
-        const known = new Set(statIds());
-        const bids = new Set();
+        const e = { tuning: [], bases: {}, sets: {}, uniques: {}, stats: {} };
+        const known = new Set(statIds()), bids = new Set();
+        const it = state.tuning;
+        if (typeof it.dropChance !== 'number' || it.dropChance < 0) e.tuning.push('dropChance >= 0');
+        if (typeof it.uniqueChanceCap !== 'number' || it.uniqueChanceCap < it.uniqueChance) e.tuning.push('uniqueChanceCap >= uniqueChance');
+        if (typeof it.setChanceCap !== 'number' || it.setChanceCap < it.setChance) e.tuning.push('setChanceCap >= setChance');
         state.bases.forEach((b, i) => {
           const x = [];
           if (!SNAKE.test(b.id || '')) x.push('id must be lower_snake');
           if (bids.has(b.id)) x.push('duplicate id'); bids.add(b.id);
           if (!VALID_SLOTS.includes(b.slot)) x.push('invalid slot');
-          if (!flatStatIds().includes(b.primary)) x.push('primary must be a flat stat');
-          if (!b.pool?.length) x.push('pool is empty');
-          if (b.pool?.includes(b.primary)) x.push('pool includes the primary');
-          if (b.pool?.some((s) => !known.has(s))) x.push('pool has an unknown stat');
+          if (!flatStatIds().includes(b.primary)) x.push('primary must be flat');
+          if (!b.pool?.length) x.push('pool empty');
+          if (b.pool?.includes(b.primary)) x.push('pool includes primary');
+          if (b.pool?.some((s) => !known.has(s))) x.push('unknown stat in pool');
           if (x.length) e.bases[i] = x;
         });
         Object.entries(state.sets).forEach(([id, s]) => {
@@ -159,12 +246,17 @@
           if (id !== s.id) x.push('key != id');
           if (!SNAKE.test(s.id || '')) x.push('id must be lower_snake');
           if (!RARITY_IDS.includes(s.rarity)) x.push('invalid rarity');
-          if (!s.members?.length) x.push('no members');
-          if (s.members?.some((m) => !baseIds().includes(m))) x.push('member is not a base id');
+          if (!s.items?.length) x.push('add at least one item');
+          (s.items || []).forEach((itm, j) => {
+            if (!SNAKE.test(itm.id || '')) x.push(`item ${j}: id must be lower_snake`);
+            if (!VALID_SLOTS.includes(itm.slot)) x.push(`item ${j}: invalid slot`);
+            if (!flatStatIds().includes(itm.primary)) x.push(`item ${j}: primary must be flat`);
+            if (!itm.pool?.length) x.push(`item ${j}: pool empty`);
+          });
           (s.bonuses || []).forEach((bn, j) => {
             if (!(bn.pieces >= 1)) x.push(`bonus ${j}: pieces >= 1`);
             if (!known.has(bn.stat)) x.push(`bonus ${j}: unknown stat`);
-            if (typeof bn.val !== 'number') x.push(`bonus ${j}: val must be a number`);
+            if (typeof bn.val !== 'number') x.push(`bonus ${j}: val must be number`);
           });
           if (x.length) e.sets[id] = x;
         });
@@ -174,10 +266,10 @@
           if (!SNAKE.test(u.id || '')) x.push('id must be lower_snake');
           if (uids.has(u.id)) x.push('duplicate id'); uids.add(u.id);
           if (!VALID_SLOTS.includes(u.slot)) x.push('invalid slot');
-          if (!baseIds().includes(u.base)) x.push('base is not a base id');
+          if (!baseIds().includes(u.base)) x.push('base not found');
           if (!RARITY_IDS.includes(u.rarity)) x.push('invalid rarity');
           if (!(u.dropWeight >= 0)) x.push('dropWeight >= 0');
-          if (u.set && !state.sets[u.set]) x.push('set does not exist');
+          if (u.set && !state.sets[u.set]) x.push('set not found');
           if (!u.lines?.length) x.push('no stat lines');
           u.lines?.forEach((ln, j) => {
             if (!known.has(ln.stat)) x.push(`line ${j}: unknown stat`);
@@ -189,283 +281,355 @@
           const x = [];
           if (id !== s.id) x.push('key != id');
           if (!SNAKE.test(s.id || '')) x.push('id must be lower_snake');
-          if (!DERIVED_IDS.includes(s.target)) x.push(`target must be a derived id (${DERIVED_IDS.join('/')})`);
+          if (!DERIVED_IDS.includes(s.target)) x.push(`target must be derived id`);
           if (!['flat', 'pct'].includes(s.op)) x.push('op must be flat|pct');
           if (!['flat', 'behavioral'].includes(s.kind)) x.push('kind must be flat|behavioral');
-          if (typeof s.perBudget !== 'number') x.push('perBudget must be a number');
-          if (typeof s.value !== 'number') x.push('value must be a number');
-          if (s.op === 'pct' && !(Array.isArray(s.band) && s.band.length === 2)) x.push('pct stat needs a band [min,max]');
+          if (typeof s.perBudget !== 'number') x.push('perBudget must be number');
+          if (s.op === 'pct' && !(Array.isArray(s.band) && s.band.length === 2)) x.push('pct stat needs band');
+          if (s.kind === 'behavioral' && !s.hook) x.push('behavioral needs hook');
+          if (s.kind === 'behavioral' && !s.handler) x.push('behavioral needs handler');
           if (x.length) e.stats[id] = x;
         });
         return e;
       }
 
-      // ---- TS serialization ----------------------------------------------
+      // ---- TS output ------------------------------------------------------
       const q = (s) => `'${String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
       const arr = (a, f = q) => `[${a.map(f).join(', ')}]`;
-      // ordered [key, value|undefined] pairs → inline TS object (undefined dropped)
-      const obj = (pairs) => `{ ${pairs.filter(([, v]) => v !== undefined).map(([k, v]) => `${k}: ${v}`).join(', ')} }`;
+      const obj = (prs) => `{ ${prs.filter(([,v])=>v!==undefined).map(([k,v])=>`${k}: ${v}`).join(', ')} }`;
 
-      function basesTs() {
-        const rows = state.bases.map((b) =>
-          '  ' + obj([['id', q(b.id)], ['name', q(b.name)], ['slot', q(b.slot)], ['primary', q(b.primary)], ['pool', arr(b.pool)]]) + ','
-        );
-        return `export const BASES: BaseItem[] = [\n${rows.join('\n')}\n];`;
+      function genTS() {
+        const it = state.tuning;
+        return {
+          tuning: [
+            `dropChance: ${it.dropChance},`, `swarmDropMult: ${it.swarmDropMult},`,
+            `budgetBase: ${it.budgetBase},`, `budgetPerDepth: ${it.budgetPerDepth},`, `affixBudgetFrac: ${it.affixBudgetFrac},`,
+            `// Unique: ${it.uniqueChance} + depth×${it.uniqueChancePerDepth} → ~${(it.uniqueChance+100*it.uniqueChancePerDepth).toFixed(1)}% @depth 100, cap ${it.uniqueChanceCap}`,
+            `uniqueChance: ${it.uniqueChance},`, `uniqueChancePerDepth: ${it.uniqueChancePerDepth},`, `uniqueChanceCap: ${it.uniqueChanceCap},`,
+            `// Set: ${it.setChance} + depth×${it.setChancePerDepth} → ~${(it.setChance+100*it.setChancePerDepth).toFixed(1)}% @depth 100, cap ${it.setChanceCap}`,
+            `setChance: ${it.setChance},`, `setChancePerDepth: ${it.setChancePerDepth},`, `setChanceCap: ${it.setChanceCap},`,
+            `sellValueMult: ${it.sellValueMult},`,
+          ].join('\n'),
+          bases: `export const BASES: BaseItem[] = [\n${state.bases.map((b)=>'  '+obj([['id',q(b.id)],['name',q(b.name)],['slot',q(b.slot)],['primary',q(b.primary)],['pool',arr(b.pool)]])+',').join('\n')}\n];`,
+          sets: `export const SETS: Record<string, SetDef> = {\n${Object.values(state.sets).map((s)=>{
+            const items=arr(s.items,(itm)=>obj([['id',q(itm.id)],['name',q(itm.name)],['slot',q(itm.slot)],['primary',q(itm.primary)],['pool',arr(itm.pool)]]));
+            const bonuses=arr(s.bonuses,(bn)=>obj([['pieces',bn.pieces],['stat',q(bn.stat)],['val',bn.val]]));
+            return `  ${s.id}: {\n    id: ${q(s.id)},\n    name: ${q(s.name)},\n    rarity: ${q(s.rarity)},\n    items: ${items},\n    bonuses: ${bonuses},\n  },`;
+          }).join('\n')}\n};`,
+          uniques: `export const UNIQUES: UniqueItem[] = [\n${state.uniques.map((u)=>{const stats='{ '+u.lines.map((ln)=>`${ln.stat}: [${ln.min}, ${ln.max}]`).join(', ')+' }';return '  '+obj([['id',q(u.id)],['name',q(u.name)],['slot',q(u.slot)],['base',q(u.base)],['rarity',q(u.rarity)],['stats',stats],['dropWeight',u.dropWeight],['set',u.set?q(u.set):undefined]])+',';}).join('\n')}\n];`,
+          stats: (()=>{const ids=statIds();return `export type StatId =\n${ids.map((id,i)=>`  ${i===0?'| ':'| '}${q(id)}`).join('\n')};\n\nexport const STATS: Record<StatId, StatDef> = {\n${ids.map((id)=>{const s=state.stats[id];return '  '+`${id}: `+obj([['id',q(s.id)],['name',q(s.name)],['abbr',q(s.abbr)],['pct',s.pct?'true':undefined],['target',q(s.target)],['op',q(s.op)],['perBudget',s.perBudget],['band',Array.isArray(s.band)&&s.band[0]!=null?`[${s.band[0]}, ${s.band[1]}]`:undefined],['value',s.value],['kind',q(s.kind)],['max',s.max!=null&&s.max!==''?s.max:undefined],['hook',s.hook?q(s.hook):undefined],['handler',s.handler?q(s.handler):undefined],['implemented',s.implemented===false?'false':undefined]])+',';}).join('\n')}\n};`;})(),
+        };
       }
-      function setsTs() {
-        const rows = Object.values(state.sets).map((s) => {
-          const bonuses = arr(s.bonuses, (bn) => obj([['pieces', bn.pieces], ['stat', q(bn.stat)], ['val', bn.val]]));
-          return `  ${s.id}: {\n    id: ${q(s.id)},\n    name: ${q(s.name)},\n    rarity: ${q(s.rarity)},\n    members: ${arr(s.members)},\n    bonuses: ${bonuses},\n  },`;
-        });
-        return `export const SETS: Record<string, SetDef> = {\n${rows.join('\n')}\n};`;
+
+      function renderRight() {
+        const ts = genTS();
+        $('right-panel').innerHTML = `<h2>Generated TS</h2>` +
+          block('tuning.ts → TUNING.items', ts.tuning) +
+          block('items.ts → BASES', ts.bases) +
+          block('sets.ts → SETS', ts.sets) +
+          block('uniques.ts → UNIQUES', ts.uniques) +
+          block('stats.ts → StatId + STATS', ts.stats);
       }
-      function uniquesTs() {
-        const rows = state.uniques.map((u) => {
-          const stats = '{ ' + u.lines.map((ln) => `${ln.stat}: [${ln.min}, ${ln.max}]`).join(', ') + ' }';
-          return '  ' + obj([
-            ['id', q(u.id)], ['name', q(u.name)], ['slot', q(u.slot)], ['base', q(u.base)],
-            ['rarity', q(u.rarity)], ['stats', stats], ['dropWeight', u.dropWeight],
-            ['set', u.set ? q(u.set) : undefined],
-          ]) + ',';
-        });
-        return `export const UNIQUES: UniqueItem[] = [\n${rows.join('\n')}\n];`;
+      function block(label, code) {
+        return `<div class="ts-block"><div class="ts-head"><strong>${label}</strong><button class="mini" data-copy="${label}">Copy</button></div><textarea readonly rows="${Math.min(18, code.split('\n').length)}">${esc(code)}</textarea></div>`;
       }
-      function statsTs() {
-        const ids = statIds();
-        const union = `export type StatId =\n${ids.map((id, i) => `  ${i === 0 ? '| ' : '| '}${q(id)}`).join('\n')};`;
-        const rows = ids.map((id) => {
-          const s = state.stats[id];
-          return '  ' + `${id}: ` + obj([
-            ['id', q(s.id)], ['name', q(s.name)], ['abbr', q(s.abbr)],
-            ['pct', s.pct ? 'true' : undefined],
-            ['target', q(s.target)], ['op', q(s.op)], ['perBudget', s.perBudget],
-            ['band', Array.isArray(s.band) ? `[${s.band[0]}, ${s.band[1]}]` : undefined],
-            ['value', s.value], ['kind', q(s.kind)],
-            ['max', s.max !== undefined && s.max !== null && s.max !== '' ? s.max : undefined],
-            ['implemented', s.implemented === false ? 'false' : undefined],
-          ]) + ',';
-        });
-        return `${union}\n\nexport const STATS: Record<StatId, StatDef> = {\n${rows.join('\n')}\n};`;
+      const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+      // ---- pool pills -----------------------------------------------------
+      function poolPills(pool, primary, prefix) {
+        const sLower = poolSearch.toLowerCase();
+        let html = `<input class="search" placeholder="Filter stats…" value="${escAttr(poolSearch)}" data-psearch="${prefix}" style="width:100%;margin-bottom:4px"/>`;
+        const selected = pool || [];
+        for (const cat of STAT_CATS) {
+          const visible = cat.stats.filter((id) => {
+            if (!statIds().includes(id)) return false;
+            if (sLower && !id.toLowerCase().includes(sLower) && !(state.stats[id]?.name||'').toLowerCase().includes(sLower)) return false;
+            return true;
+          });
+          if (!visible.length) continue;
+          html += `<div class="pool-cat"><div class="pool-cat-name">${cat.name}</div><div class="pool-pills">`;
+          for (const id of visible) {
+            const s = state.stats[id], isPrimary = id === primary;
+            const on = isPrimary || selected.includes(id);
+            const cls = isPrimary ? 'primary' : on ? (s.kind==='behavioral'?'behv':s.op==='pct'?'pct':'on') : 'off';
+            html += `<span class="stat-pill ${cls}" data-pool="${prefix}:${id}" title="${s.name} (${s.op}→${s.target})${!isImpl(id)?' — staged':''}">${s.abbr}${s.pct?'%':''}${!isImpl(id)?' ⚑':''}</span>`;
+          }
+          html += `</div></div>`;
+        }
+        const maxA = Math.max(...RARITIES.map((r) => Math.min(AFFIXES_BY_RARITY[r.id], selected.length)));
+        html += `<div class="pill" style="margin-top:3px">${selected.length} in pool · max ${maxA} affixes</div>`;
+        return html;
       }
-      function regen() {
-        $('out-bases').value = basesTs();
-        $('out-sets').value = setsTs();
-        $('out-uniques').value = uniquesTs();
-        $('out-stats').value = statsTs();
+
+      function handlePoolClick(e) {
+        const pill = e.target.closest('[data-pool]'); if (!pill) return;
+        const [prefix, statId] = pill.dataset.pool.split(':');
+        const parts = prefix.split('-');
+        if (parts[0]==='base') { const b=state.bases[+parts[1]]; if(statId===b.primary)return; b.pool=b.pool||[]; b.pool.includes(statId)?b.pool=b.pool.filter((s)=>s!==statId):b.pool.push(statId); }
+        else if (parts[0]==='set') { const itm=state.sets[parts[1]].items[+parts[2]]; if(statId===itm.primary)return; itm.pool=itm.pool||[]; itm.pool.includes(statId)?itm.pool=itm.pool.filter((s)=>s!==statId):itm.pool.push(statId); }
+        render();
+      }
+
+      // ---- simulator ------------------------------------------------------
+      async function runSim(depth, n) {
+        const { rollGear } = await import('../src/shared/content/items.ts');
+        const counts = { common:0,uncommon:0,rare:0,epic:0,legendary:0,set:0,unique:0 };
+        for (let i=0;i<n;i++) { const item=rollGear(depth,Math.random); if(item.unique)counts.unique++; else if(item.set)counts.set++; else counts[item.r]=(counts[item.r]||0)+1; }
+        return counts;
+      }
+      let simResult=null;
+      window.runSimulation = async () => {
+        const depth=+($('sim-depth').value||50), n=+($('sim-count').value||1000);
+        $('sim-btn').textContent='Running…'; $('sim-btn').disabled=true;
+        simResult = await runSim(depth, n);
+        $('sim-btn').textContent='▶ Simulate'; $('sim-btn').disabled=false;
+        render();
+      };
+      function renderSim() {
+        if (!simResult) return '';
+        const n = Object.values(simResult).reduce((a,b)=>a+b,0);
+        const bars = [{k:'common',c:'#c8c8c8',l:'Common'},{k:'uncommon',c:'#5bd06a',l:'Uncommon'},{k:'rare',c:'#4aa3ff',l:'Rare'},{k:'epic',c:'#b45bff',l:'Epic'},{k:'legendary',c:'#ffb020',l:'Legendary'},{k:'set',c:'#2ecf7f',l:'Set'},{k:'unique',c:'#ff8a3d',l:'Unique'}];
+        const max=Math.max(...bars.map((b)=>simResult[b.k]),1);
+        return `<table class="sim-result">${bars.map((b)=>{const c=simResult[b.k]||0;return `<tr><td>${b.l}</td><td><span class="bar" style="width:${Math.max(1,Math.round((c/max)*160))}px;background:${b.c}"></span></td><td>${c}</td><td>(${((c/n)*100).toFixed(1)}%)</td></tr>`}).join('')}</table>`;
       }
 
       // ---- render helpers -------------------------------------------------
-      const opts = (list, sel, label = (x) => x) =>
-        list.map((v) => `<option value="${v}" ${v === sel ? 'selected' : ''}>${label(v)}</option>`).join('');
-      const noneOpt = (sel) => `<option value="" ${!sel ? 'selected' : ''}>— none —</option>`;
+      const opts = (list, sel, label = (x) => x) => list.map((v) => `<option value="${v}" ${v===sel?'selected':''}>${label(v)}</option>`).join('');
+      const noneOpt = (sel) => `<option value="" ${!sel?'selected':''}>— none —</option>`;
+      const fld = (l, inner) => `<label>${l}${inner}</label>`;
+      const escAttr = (s) => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+      function card(key, title, sub, delAttr, err, body) {
+        const open = !collapsed.has(key);
+        const [dk, dv] = delAttr.split('=');
+        const errCount = err ? err.length : 0;
+        return `<div class="card${open?' open':''}${err?' bad':''}" data-card="${key}"><div class="card-head" data-toggle="${key}">`+
+          `<span class="title"><span class="card-toggle">▶</span> ${title} <span class="pill">${sub}</span>${errCount?` <span style="color:#ff6b6b">${errCount}!</span>`:''}</span>`+
+          `<button class="mini" data-${dk}="${dv}">✕</button></div>`+
+          `<div class="card-body">${body}${err?`<div class="err-lines">⚠ ${err.join('\n')}</div>`:''}</div></div>`;
+      }
+      function section(label, color, count) {
+        return `<div class="section"><div class="section-head"><span style="color:${color||'#9d8fc0'}">${label}</span><span class="ct">${count}</span></div>`;
+      }
+
+      function renderTuning(errs) {
+        const it = state.tuning;
+        return card('tuning-main','Drop Rates & Budget','', '', errs.tuning,
+          `<div class="row">`+fld('drop',`<input class="num" type="number" step="0.01" data-tf="dropChance" value="${it.dropChance}"/>`)+fld('swarm×',`<input class="num" type="number" step="0.1" data-tf="swarmDropMult" value="${it.swarmDropMult}"/>`)+fld('budget',`<input class="num" type="number" step="0.1" data-tf="budgetBase" value="${it.budgetBase}"/>`)+fld('/depth',`<input class="num" type="number" step="0.05" data-tf="budgetPerDepth" value="${it.budgetPerDepth}"/>`)+fld('affix%',`<input class="num" type="number" step="0.05" data-tf="affixBudgetFrac" value="${it.affixBudgetFrac}"/>`)+fld('sell×',`<input class="num" type="number" step="0.05" data-tf="sellValueMult" value="${it.sellValueMult}"/>`)+`</div>`+
+          `<div class="row">`+fld('unique',`<input class="num" type="number" step="0.001" data-tf="uniqueChance" value="${it.uniqueChance}"/>`)+fld('/depth',`<input class="num" type="number" step="0.0001" data-tf="uniqueChancePerDepth" value="${it.uniqueChancePerDepth}"/>`)+fld('cap',`<input class="num" type="number" step="0.005" data-tf="uniqueChanceCap" value="${it.uniqueChanceCap}"/>`)+`</div>`+
+          `<div class="row">`+fld('set',`<input class="num" type="number" step="0.001" data-tf="setChance" value="${it.setChance}"/>`)+fld('/depth',`<input class="num" type="number" step="0.0001" data-tf="setChancePerDepth" value="${it.setChancePerDepth}"/>`)+fld('cap',`<input class="num" type="number" step="0.005" data-tf="setChanceCap" value="${it.setChanceCap}"/>`)+`</div>`+
+          `<div class="row" style="margin-top:6px">`+fld('depth',`<input class="num" id="sim-depth" type="number" value="50" style="width:66px"/>`)+fld('drops',`<input class="num" id="sim-count" type="number" value="1000" style="width:76px"/>`)+`<button id="sim-btn" onclick="runSimulation()">▶ Simulate</button></div><div id="sim-out">${renderSim()}</div>`);
+      }
 
       function renderBases(errs) {
-        return state.bases.map((b, i) => {
-          const err = errs.bases[i];
-          const pool = statIds().map((s) => {
-            const on = b.pool?.includes(s), primary = s === b.primary;
-            const impl = isImpl(s) ? '' : ' <span class="badge">staged</span>';
-            return `<label><input type="checkbox" data-pool="${i}" value="${s}" ${on ? 'checked' : ''} ${primary ? 'disabled' : ''}/> ${s}${impl}</label>`;
-          }).join('');
-          const counts = RARITIES.map((r) => `${r.name[0]}:${Math.min(AFFIXES_BY_RARITY[r.id], b.pool?.length ?? 0)}`).join(' ');
-          return card(b.name || '(unnamed)', b.slot, `del-base=${i}`, err,
-            `<div class="row">` +
-            fld('id', `<input class="id" data-bf="id" data-i="${i}" value="${b.id ?? ''}"/>`) +
-            fld('name', `<input class="name" data-bf="name" data-i="${i}" value="${b.name ?? ''}"/>`) +
-            fld('slot', `<select data-bf="slot" data-i="${i}">${opts(VALID_SLOTS, b.slot)}</select>`) +
-            fld('primary', `<select data-bf="primary" data-i="${i}">${opts(flatStatIds(), b.primary)}</select>`) +
-            `</div><div class="pill">affix pool — rarity→count: ${counts}</div><div class="pool">${pool}</div>`);
-        }).join('') || empty('No bases.');
+        const notes = diversityNotes();
+        let html = notes.length ? `<div class="info-lines">⚑ ${notes.join('<br>')}</div>` : '';
+        // group by slot
+        const bySlot = {};
+        state.bases.forEach((b) => { (bySlot[b.slot] = bySlot[b.slot] || []).push(b); });
+        for (const slot of VALID_SLOTS) {
+          const items = bySlot[slot] || [];
+          const visible = items.filter((b, i) => {
+            const idx = state.bases.indexOf(b);
+            if (slotFilter && slot !== slotFilter) return false;
+            const s = cardSearch.toLowerCase();
+            if (s && !b.id.toLowerCase().includes(s) && !(b.name||'').toLowerCase().includes(s)) return false;
+            return true;
+          });
+          if (!visible.length) continue;
+          html += section(slot, SLOT_COLORS[slot]||'#9d8fc0', visible.length);
+          for (const b of visible) {
+            const i = state.bases.indexOf(b), key = `base-${i}`, err = errs.bases[i];
+            const staged = (b.pool||[]).filter((s)=>!isImpl(s));
+            const warn = staged.length ? `<div class="pill warn">⚑ staged in pool: ${staged.join(', ')}</div>` : '';
+            html += card(key, b.name||'(unnamed)', slot, `del-base=${i}`, err,
+              `<div class="row">`+fld('id',`<input class="id" data-bf="id" data-i="${i}" value="${escAttr(b.id??'')}"/>`)+fld('name',`<input class="name" data-bf="name" data-i="${i}" value="${escAttr(b.name??'')}"/>`)+fld('slot',`<select data-bf="slot" data-i="${i}">${opts(VALID_SLOTS,b.slot)}</select>`)+fld('primary',`<select data-bf="primary" data-i="${i}">${opts(flatStatIds(),b.primary)}</select>`)+`</div>`+
+              warn + `<div class="pool-section">${poolPills(b.pool, b.primary, `base-${i}`)}</div>`);
+          }
+          html += `</div>`;
+        }
+        return html || '<div class="hint">No bases. Add one per slot.</div>';
       }
 
       function renderSets(errs) {
-        return Object.values(state.sets).map((s) => {
-          const err = errs.sets[s.id];
-          const members = baseIds().map((bid) =>
-            `<label><input type="checkbox" data-member="${s.id}" value="${bid}" ${s.members?.includes(bid) ? 'checked' : ''}/> ${bid}</label>`
-          ).join('') || '<span class="pill">no bases to add</span>';
-          const bonuses = (s.bonuses || []).map((bn, j) =>
-            `<div class="line-row">` +
-            fld('pieces', `<input class="num" type="number" min="1" data-snf="pieces" data-sid="${s.id}" data-j="${j}" value="${bn.pieces}"/>`) +
-            fld('stat', `<select data-snf="stat" data-sid="${s.id}" data-j="${j}">${opts(statIds(), bn.stat)}</select>`) +
-            fld('val', `<input class="num" type="number" data-snf="val" data-sid="${s.id}" data-j="${j}" value="${bn.val}"/>`) +
-            `<button class="mini" data-del-bonus="${s.id}:${j}">✕</button></div>`
+        let html = '';
+        for (const [id, s] of Object.entries(state.sets)) {
+          if (slotFilter) continue; // sets span multiple slots
+          const cs = cardSearch.toLowerCase();
+          if (cs && !s.id.toLowerCase().includes(cs) && !(s.name||'').toLowerCase().includes(cs)) continue;
+          const err = errs.sets[id];
+          const sitems = (s.items||[]).map((itm, j) => {
+            const ikey = `set-${id}-${j}`;
+            return card(ikey, itm.name||'(unnamed)', itm.slot, '', null,
+              `<div class="row">`+fld('id',`<input class="id" data-sif="id" data-sid="${id}" data-j="${j}" value="${escAttr(itm.id??'')}"/>`)+fld('name',`<input class="name" data-sif="name" data-sid="${id}" data-j="${j}" value="${escAttr(itm.name??'')}"/>`)+fld('slot',`<select data-sif="slot" data-sid="${id}" data-j="${j}">${opts(VALID_SLOTS,itm.slot)}</select>`)+fld('primary',`<select data-sif="primary" data-sid="${id}" data-j="${j}">${opts(flatStatIds(),itm.primary)}</select>`)+`</div>`+
+              `<div class="pool-section">${poolPills(itm.pool, itm.primary, `set-${id}-${j}`)}</div>`);
+          }).join('');
+          const bonuses = (s.bonuses||[]).map((bn, j) =>
+            `<div class="line-row">`+fld('pieces',`<input class="num" type="number" min="1" data-snf="pieces" data-sid="${id}" data-j="${j}" value="${bn.pieces}"/>`)+fld('stat',`<select data-snf="stat" data-sid="${id}" data-j="${j}">${opts(statIds(),bn.stat)}</select>`)+fld('val',`<input class="num" type="number" data-snf="val" data-sid="${id}" data-j="${j}" value="${bn.val}"/>`)+`<button class="mini" data-del-bonus="${id}:${j}">✕</button></div>`
           ).join('');
-          return card(s.name || '(unnamed)', s.id, `del-set=${s.id}`, err,
-            `<div class="row">` +
-            fld('id', `<input class="id" data-setf="id" data-sid="${s.id}" value="${s.id}"/>`) +
-            fld('name', `<input class="name" data-setf="name" data-sid="${s.id}" value="${s.name ?? ''}"/>`) +
-            fld('rarity', `<select data-setf="rarity" data-sid="${s.id}">${opts(RARITY_IDS, s.rarity)}</select>`) +
-            `</div><div class="pill">members</div><div class="pool">${members}</div>` +
-            `<div class="pill" style="margin-top:6px">bonuses</div>${bonuses}<button class="mini" data-add-bonus="${s.id}">+ bonus</button>`);
-        }).join('') || empty('No sets.');
+          html += card(`set-${id}`, s.name||'(unnamed)', s.rarity, `del-set=${id}`, err,
+            `<div class="row">`+fld('id',`<input class="id" data-setf="id" data-sid="${id}" value="${escAttr(s.id)}"/>`)+fld('name',`<input class="name" data-setf="name" data-sid="${id}" value="${escAttr(s.name??'')}"/>`)+fld('rarity',`<select data-setf="rarity" data-sid="${id}">${opts(RARITY_IDS,s.rarity)}</select>`)+`</div>`+
+            `<div class="pill">${sitems.length} set item(s) <button class="mini" data-add-sitem="${id}">+</button></div>${sitems}`+
+            `<div class="pill" style="margin-top:6px">Bonuses <button class="mini" data-add-bonus="${id}">+</button></div>${bonuses}`);
+        }
+        return html || '<div class="hint">No sets.</div>';
       }
 
       function renderUniques(errs) {
-        return state.uniques.map((u, i) => {
+        let html = '';
+        for (let i = 0; i < state.uniques.length; i++) {
+          const u = state.uniques[i];
+          if (slotFilter && u.slot !== slotFilter) continue;
+          const cs = cardSearch.toLowerCase();
+          if (cs && !u.id.toLowerCase().includes(cs) && !(u.name||'').toLowerCase().includes(cs)) continue;
           const err = errs.uniques[i];
-          const lines = (u.lines || []).map((ln, j) =>
-            `<div class="line-row">` +
-            fld('stat', `<select data-ulf="stat" data-i="${i}" data-j="${j}">${opts(statIds(), ln.stat)}</select>`) +
-            fld('min', `<input class="num" type="number" data-ulf="min" data-i="${i}" data-j="${j}" value="${ln.min}"/>`) +
-            fld('max', `<input class="num" type="number" data-ulf="max" data-i="${i}" data-j="${j}" value="${ln.max}"/>`) +
-            `<button class="mini" data-del-line="${i}:${j}">✕</button></div>`
+          const ikey = `unique-${i}`;
+          const lines = (u.lines||[]).map((ln, j) =>
+            `<div class="line-row">`+fld('stat',`<select data-ulf="stat" data-i="${i}" data-j="${j}">${opts(statIds(),ln.stat)}</select>`)+fld('min',`<input class="num" type="number" data-ulf="min" data-i="${i}" data-j="${j}" value="${ln.min}"/>`)+fld('max',`<input class="num" type="number" data-ulf="max" data-i="${i}" data-j="${j}" value="${ln.max}"/>`)+`<button class="mini" data-del-line="${i}:${j}">✕</button></div>`
           ).join('');
-          return card(u.name || '(unnamed)', u.slot, `del-unique=${i}`, err,
-            `<div class="row">` +
-            fld('id', `<input class="id" data-uf="id" data-i="${i}" value="${u.id ?? ''}"/>`) +
-            fld('name', `<input class="name" data-uf="name" data-i="${i}" value="${u.name ?? ''}"/>`) +
-            fld('slot', `<select data-uf="slot" data-i="${i}">${opts(VALID_SLOTS, u.slot)}</select>`) +
-            fld('base', `<select data-uf="base" data-i="${i}">${opts(baseIds(), u.base)}</select>`) +
-            fld('rarity', `<select data-uf="rarity" data-i="${i}">${opts(RARITY_IDS, u.rarity)}</select>`) +
-            fld('dropWeight', `<input class="num" type="number" step="0.1" data-uf="dropWeight" data-i="${i}" value="${u.dropWeight}"/>`) +
-            fld('set', `<select data-uf="set" data-i="${i}">${noneOpt(u.set)}${opts(setIds(), u.set)}</select>`) +
-            `</div><div class="pill">signature lines (rolled in [min,max])</div>${lines}<button class="mini" data-add-line="${i}">+ line</button>`);
-        }).join('') || empty('No uniques.');
+          html += card(ikey, u.name||'(unnamed)', u.slot, `del-unique=${i}`, err,
+            `<div class="row">`+fld('id',`<input class="id" data-uf="id" data-i="${i}" value="${escAttr(u.id??'')}"/>`)+fld('name',`<input class="name" data-uf="name" data-i="${i}" value="${escAttr(u.name??'')}"/>`)+fld('slot',`<select data-uf="slot" data-i="${i}">${opts(VALID_SLOTS,u.slot)}</select>`)+fld('base',`<select data-uf="base" data-i="${i}">${opts(baseIds(),u.base)}</select>`)+fld('rarity',`<select data-uf="rarity" data-i="${i}">${opts(RARITY_IDS,u.rarity)}</select>`)+fld('weight',`<input class="num" type="number" step="0.1" data-uf="dropWeight" data-i="${i}" value="${u.dropWeight}"/>`)+fld('set',`<select data-uf="set" data-i="${i}">${noneOpt(u.set)}${opts(setIds(),u.set)}</select>`)+`</div>`+
+            `<div class="pill">${lines.length} line(s) <button class="mini" data-add-line="${i}">+</button></div>${lines}`);
+        }
+        return html || '<div class="hint">No uniques.</div>';
       }
 
       function renderStats(errs) {
-        return Object.values(state.stats).map((s) => {
-          const err = errs.stats[s.id];
-          const pctRow = s.op === 'pct'
-            ? fld('band min', `<input class="num" type="number" data-stf="bandMin" data-sid="${s.id}" value="${s.band?.[0] ?? ''}"/>`) +
-              fld('band max', `<input class="num" type="number" data-stf="bandMax" data-sid="${s.id}" value="${s.band?.[1] ?? ''}"/>`)
-            : '';
-          const behavioralNote = s.kind === 'behavioral' && s.implemented === false
-            ? `<div class="pill" style="color:#ffb84d">⚑ staged — needs a LaneScene hook before it rolls onto items</div>` : '';
-          return card(s.name || '(unnamed)', `${s.op} → ${s.target}`, `del-stat=${s.id}`, err,
-            `<div class="row">` +
-            fld('id', `<input class="id" data-stf="id" data-sid="${s.id}" value="${s.id}"/>`) +
-            fld('name', `<input class="name" data-stf="name" data-sid="${s.id}" value="${s.name ?? ''}"/>`) +
-            fld('abbr', `<input class="num" data-stf="abbr" data-sid="${s.id}" value="${s.abbr ?? ''}"/>`) +
-            fld('target', `<select data-stf="target" data-sid="${s.id}">${opts(DERIVED_IDS, s.target)}</select>`) +
-            fld('op', `<select data-stf="op" data-sid="${s.id}">${opts(['flat', 'pct'], s.op)}</select>`) +
-            fld('kind', `<select data-stf="kind" data-sid="${s.id}">${opts(['flat', 'behavioral'], s.kind)}</select>`) +
-            `</div><div class="row">` +
-            fld('perBudget', `<input class="num" type="number" step="0.05" data-stf="perBudget" data-sid="${s.id}" value="${s.perBudget}"/>`) +
-            fld('value', `<input class="num" type="number" step="0.5" data-stf="value" data-sid="${s.id}" value="${s.value}"/>`) +
-            fld('max', `<input class="num" type="number" data-stf="max" data-sid="${s.id}" value="${s.max ?? ''}"/>`) +
-            pctRow +
-            `<label class="inline"><input type="checkbox" data-stf="pct" data-sid="${s.id}" ${s.pct ? 'checked' : ''}/> show %</label>` +
-            `<label class="inline"><input type="checkbox" data-stf="implemented" data-sid="${s.id}" ${s.implemented !== false ? 'checked' : ''}/> implemented</label>` +
-            `</div>${behavioralNote}`);
-        }).join('') || empty('No stats.');
+        let html = '';
+        for (const [id, s] of Object.entries(state.stats)) {
+          const cs = cardSearch.toLowerCase();
+          if (cs && !s.id.toLowerCase().includes(cs) && !(s.name||'').toLowerCase().includes(cs)) continue;
+          const err = errs.stats[id], key = `stat-${id}`;
+          const pctRow = s.op==='pct'?fld('band',`<input class="num" type="number" data-stf="bandMin" data-sid="${id}" value="${s.band?.[0]??''}" style="width:48px"/>–<input class="num" type="number" data-stf="bandMax" data-sid="${id}" value="${s.band?.[1]??''}" style="width:48px"/>`):'';
+          const behv = s.kind==='behavioral'?`<div class="row">`+fld('hook',`<select data-stf="hook" data-sid="${id}">${noneOpt(s.hook)}${opts(HOOK_POINTS,s.hook)}</select>`)+fld('handler',`<select data-stf="handler" data-sid="${id}">${noneOpt(s.handler)}${opts(HANDLER_NAMES,s.handler)}</select>`)+`</div>`:'';
+          const tag = s.kind==='behavioral'&&s.implemented===false?`<span class="pill warn">⚑ staged</span>`:s.kind==='behavioral'?`<span class="badge ok">live</span>`:'';
+          html += card(key, s.name||'(unnamed)', `${s.op}→${s.target} ${tag}`, `del-stat=${id}`, err,
+            `<div class="row">`+fld('id',`<input class="id" data-stf="id" data-sid="${id}" value="${escAttr(s.id)}"/>`)+fld('name',`<input class="name" data-stf="name" data-sid="${id}" value="${escAttr(s.name??'')}"/>`)+fld('abbr',`<input style="width:44px" data-stf="abbr" data-sid="${id}" value="${escAttr(s.abbr??'')}"/>`)+fld('target',`<select data-stf="target" data-sid="${id}">${opts(DERIVED_IDS,s.target)}</select>`)+fld('op',`<select data-stf="op" data-sid="${id}">${opts(['flat','pct'],s.op)}</select>`)+fld('kind',`<select data-stf="kind" data-sid="${id}">${opts(['flat','behavioral'],s.kind)}</select>`)+fld('pB',`<input class="num" type="number" step="0.05" data-stf="perBudget" data-sid="${id}" value="${s.perBudget}"/>`)+fld('val',`<input class="num" type="number" step="0.5" data-stf="value" data-sid="${id}" value="${s.value}"/>`)+fld('max',`<input class="num" type="number" data-stf="max" data-sid="${id}" value="${s.max??''}"/>`)+`</div>`+
+            `<div class="row">${pctRow}<label class="inline"><input type="checkbox" data-stf="pct" data-sid="${id}" ${s.pct?'checked':''}/> %</label><label class="inline"><input type="checkbox" data-stf="implemented" data-sid="${id}" ${s.implemented!==false?'checked':''}/> impl</label></div>${behv}`);
+        }
+        return html || '<div class="hint">No stats.</div>';
       }
 
-      const fld = (label, inner) => `<label>${label}${inner}</label>`;
-      const empty = (msg) => `<div class="hint">${msg}</div>`;
-      function card(title, sub, delAttr, err, body) {
-        const [k, v] = delAttr.split('=');
-        return `<div class="card${err ? ' bad' : ''}"><div class="card-head"><span class="title">${title} <span class="pill">${sub}</span></span>` +
-          `<button class="mini" data-${k}="${v}">✕</button></div>${body}` +
-          (err ? `<div class="err-lines">⚠ ${err.join('\n')}</div>` : '') + `</div>`;
-      }
-
+      // ---- main render ----------------------------------------------------
       function render() {
         const errs = validate();
         $('hint').textContent = HINTS[tab];
-        $('page-bases').innerHTML = tab === 'bases' ? renderBases(errs) : '';
-        $('page-sets').innerHTML = tab === 'sets' ? renderSets(errs) : '';
-        $('page-uniques').innerHTML = tab === 'uniques' ? renderUniques(errs) : '';
-        $('page-stats').innerHTML = tab === 'stats' ? renderStats(errs) : '';
-        document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === `page-${tab}`));
-        const n = ['bases', 'sets', 'uniques', 'stats'].reduce((a, t) => a + Object.keys(errs[t]).length, 0);
-        const st = $('status');
-        st.textContent = n ? `${n} card(s) with errors · autosaved` : 'valid · autosaved';
-        st.className = n ? 'err' : '';
-        regen(); persist();
+
+        // toolbar: slot filter + card search + expand/collapse all
+        let tb = '';
+        if (tab === 'bases') {
+          tb += `<div class="slot-filter">`;
+          tb += `<span class="slot-pill${!slotFilter?' on':''}" data-sf="">all</span>`;
+          for (const sl of VALID_SLOTS) {
+            const count = state.bases.filter((b) => b.slot === sl).length;
+            tb += `<span class="slot-pill${slotFilter===sl?' on':''}" data-sf="${sl}">${sl}<span class="ct">${count}</span></span>`;
+          }
+          tb += `</div>`;
+        } else if (tab === 'uniques') {
+          tb += `<div class="slot-filter">`;
+          tb += `<span class="slot-pill${!slotFilter?' on':''}" data-sf="">all</span>`;
+          for (const sl of VALID_SLOTS) {
+            const count = state.uniques.filter((u) => u.slot === sl).length;
+            if (count) tb += `<span class="slot-pill${slotFilter===sl?' on':''}" data-sf="${sl}">${sl}<span class="ct">${count}</span></span>`;
+          }
+          tb += `</div>`;
+        }
+        tb += `<input class="search" placeholder="Filter ${tab}…" value="${escAttr(cardSearch)}" data-csearch style="width:160px"/>`;
+        const totalCards = tab==='bases'?state.bases.length:tab==='sets'?Object.keys(state.sets).length:tab==='uniques'?state.uniques.length:tab==='stats'?Object.keys(state.stats).length:1;
+        if (totalCards > 0) {
+          tb += `<button class="mini" data-expand="1">+ all</button><button class="mini" data-expand="0">− all</button>`;
+        }
+        $('toolbar').innerHTML = tb;
+
+        $('page-tuning').innerHTML = tab==='tuning' ? renderTuning(errs) : '';
+        $('page-bases').innerHTML = tab==='bases' ? renderBases(errs) : '';
+        $('page-sets').innerHTML = tab==='sets' ? renderSets(errs) : '';
+        $('page-uniques').innerHTML = tab==='uniques' ? renderUniques(errs) : '';
+        $('page-stats').innerHTML = tab==='stats' ? renderStats(errs) : '';
+        document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id===`page-${tab}`));
+        document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x.dataset.tab===tab));
+
+        const n = ['tuning','bases','sets','uniques','stats'].reduce((a, t) => { const v=errs[t]; return a+(Array.isArray(v)?v.length:Object.keys(v).length); }, 0);
+        $('status').textContent = n ? `${n} issue(s)` : 'valid';
+        $('status').className = n ? 'err' : '';
+        renderRight(); persist();
       }
+
+      // ---- tab bar --------------------------------------------------------
+      $('tab-bar').innerHTML = TAB_NAMES.map((t) => `<button class="tab${t==='tuning'?' active':''}" data-tab="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
 
       // ---- events ---------------------------------------------------------
       document.body.addEventListener('input', (e) => {
-        const t = e.target, d = t.dataset, i = d.i != null ? +d.i : null;
-        const val = t.type === 'number' ? Number(t.value) : t.value;
-        if (d.bf != null) { // base field
-          const b = state.bases[i]; b[d.bf] = t.value;
-          if (d.bf === 'primary') b.pool = (b.pool || []).filter((s) => s !== t.value);
-          render();
-        } else if (d.setf) { // set id/name/rarity
-          const s = state.sets[d.sid];
-          if (d.setf === 'id') { rekeySet(d.sid, t.value); }
-          else { s[d.setf] = t.value; render(); }
-        } else if (d.snf) { // set bonus
-          const bn = state.sets[d.sid].bonuses[+d.j];
-          bn[d.snf] = d.snf === 'stat' ? t.value : Number(t.value); render();
-        } else if (d.uf) { // unique field
-          const u = state.uniques[i];
-          if (d.uf === 'set') u.set = t.value || undefined;
-          else u[d.uf] = t.type === 'number' ? Number(t.value) : t.value;
-          render();
-        } else if (d.ulf) { // unique line
-          const ln = state.uniques[i].lines[+d.j];
-          ln[d.ulf] = d.ulf === 'stat' ? t.value : Number(t.value); render();
-        } else if (d.stf) { // stat catalog field
-          updateStat(d.sid, d.stf, t); render();
-        }
+        const t = e.target, d = t.dataset;
+        if (d.psearch != null) { poolSearch = t.value; render(); return; }
+        if (d.csearch != null) { cardSearch = t.value; render(); return; }
+        const i = d.i != null ? +d.i : null;
+        const val = t.type==='number' ? Number(t.value) : t.value;
+        if (d.tf != null) { state.tuning[d.tf] = t.type==='number'?Number(t.value):t.value; render(); }
+        else if (d.bf != null) { const b=state.bases[i]; b[d.bf]=t.value; if(d.bf==='primary') b.pool=(b.pool||[]).filter((s)=>s!==t.value); render(); }
+        else if (d.setf) { if(d.setf==='id') rekeySet(d.sid,t.value); else state.sets[d.sid][d.setf]=t.value; render(); }
+        else if (d.sif) { state.sets[d.sid].items[+d.j][d.sif]=t.value; render(); }
+        else if (d.snf) { const bn=state.sets[d.sid].bonuses[+d.j]; bn[d.snf]=d.snf==='stat'?t.value:Number(t.value); render(); }
+        else if (d.uf) { const u=state.uniques[i]; if(d.uf==='set') u.set=t.value||undefined; else u[d.uf]=t.type==='number'?Number(t.value):t.value; render(); }
+        else if (d.ulf) { const ln=state.uniques[i].lines[+d.j]; ln[d.ulf]=d.ulf==='stat'?t.value:Number(t.value); render(); }
+        else if (d.stf) { updateStat(d.sid,d.stf,t); render(); }
       });
 
       document.body.addEventListener('change', (e) => {
         const t = e.target, d = t.dataset;
-        if (d.pool != null) {
-          const b = state.bases[+d.pool]; b.pool = b.pool || [];
-          if (t.checked) { if (!b.pool.includes(t.value)) b.pool.push(t.value); }
-          else b.pool = b.pool.filter((s) => s !== t.value);
-          render();
-        } else if (d.member != null) {
-          const s = state.sets[d.member]; s.members = s.members || [];
-          if (t.checked) { if (!s.members.includes(t.value)) s.members.push(t.value); }
-          else s.members = s.members.filter((m) => m !== t.value);
-          render();
-        } else if (d.stf === 'pct' || d.stf === 'implemented') {
-          state.stats[d.sid][d.stf] = t.checked; render();
-        }
+        if (d.stf==='pct'||d.stf==='implemented') { state.stats[d.sid][d.stf]=t.checked; render(); }
       });
 
       document.body.addEventListener('click', (e) => {
         const t = e.target, d = t.dataset;
-        if (d.tab) { tab = d.tab; document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x.dataset.tab === tab)); render(); }
-        else if (d.delBase != null) { state.bases.splice(+d.delBase, 1); render(); }
+        if (d.tab) { tab=d.tab; slotFilter=''; cardSearch=''; poolSearch=''; simResult=null; render(); }
+        else if (d.sf != null) { slotFilter = d.sf; render(); }
+        else if (d.expand != null) {
+          const open = d.expand === '1';
+          if (tab==='bases') state.bases.forEach((_,i) => open ? collapsed.delete(`base-${i}`) : collapsed.add(`base-${i}`));
+          else if (tab==='sets') Object.keys(state.sets).forEach((id) => { open ? collapsed.delete(`set-${id}`) : collapsed.add(`set-${id}`); state.sets[id].items.forEach((_,j) => open ? collapsed.delete(`set-${id}-${j}`) : collapsed.add(`set-${id}-${j}`)); });
+          else if (tab==='uniques') state.uniques.forEach((_,i) => open ? collapsed.delete(`unique-${i}`) : collapsed.add(`unique-${i}`));
+          else if (tab==='stats') Object.keys(state.stats).forEach((id) => open ? collapsed.delete(`stat-${id}`) : collapsed.add(`stat-${id}`));
+          render();
+        }
+        else if (d.toggle) { if (collapsed.has(d.toggle)) collapsed.delete(d.toggle); else collapsed.add(d.toggle); render(); }
+        else if (d.delBase != null) { state.bases.splice(+d.delBase,1); render(); }
         else if (d.delSet) { delete state.sets[d.delSet]; render(); }
-        else if (d.delUnique != null) { state.uniques.splice(+d.delUnique, 1); render(); }
+        else if (d.delUnique != null) { state.uniques.splice(+d.delUnique,1); render(); }
         else if (d.delStat) { delete state.stats[d.delStat]; render(); }
-        else if (d.delBonus) { const [sid, j] = d.delBonus.split(':'); state.sets[sid].bonuses.splice(+j, 1); render(); }
-        else if (d.addBonus) { state.sets[d.addBonus].bonuses.push({ pieces: 2, stat: flatStatIds()[0], val: 1 }); render(); }
-        else if (d.delLine) { const [i, j] = d.delLine.split(':'); state.uniques[+i].lines.splice(+j, 1); render(); }
-        else if (d.addLine != null) { state.uniques[+d.addLine].lines.push({ stat: statIds()[0], min: 1, max: 1 }); render(); }
-        else if (d.copy) { navigator.clipboard.writeText($(d.copy).value); t.textContent = 'Copied!'; setTimeout(() => (t.textContent = 'Copy'), 1000); }
+        else if (d.delSitem) { const [sid,j]=d.delSitem.split(':'); state.sets[sid].items.splice(+j,1); render(); }
+        else if (d.addSitem) { state.sets[d.addSitem].items.push({ id:`${d.addSitem}_it${state.sets[d.addSitem].items.length+1}`, name:'New Item', slot:'hand1', primary:flatStatIds()[0], pool:[] }); render(); }
+        else if (d.delBonus) { const [sid,j]=d.delBonus.split(':'); state.sets[sid].bonuses.splice(+j,1); render(); }
+        else if (d.addBonus) { state.sets[d.addBonus].bonuses.push({ pieces:2, stat:flatStatIds()[0]||statIds()[0], val:1 }); render(); }
+        else if (d.delLine) { const [i,j]=d.delLine.split(':'); state.uniques[+i].lines.splice(+j,1); render(); }
+        else if (d.addLine != null) { state.uniques[+d.addLine].lines.push({ stat:statIds()[0], min:1, max:1 }); render(); }
+        else if (d.copy) { const ta = document.querySelector(`[data-copy="${d.copy}"]`)?.closest('.ts-block')?.querySelector('textarea'); if (ta) { navigator.clipboard.writeText(ta.value); t.textContent='✓'; setTimeout(()=>(t.textContent='Copy'),800); } }
+        else if (d.pool) { handlePoolClick(e); }
       });
 
       function updateStat(id, field, t) {
         const s = state.stats[id];
-        if (field === 'id') return rekeyStat(id, t.value);
-        if (field === 'bandMin' || field === 'bandMax') {
-          s.band = s.band || [0, 0];
-          s.band[field === 'bandMin' ? 0 : 1] = Number(t.value);
-        } else if (['perBudget', 'value'].includes(field)) s[field] = Number(t.value);
-        else if (field === 'max') s.max = t.value === '' ? undefined : Number(t.value);
-        else s[field] = t.value;
+        if (field==='id') return rekeyStat(id, t.value);
+        if (field==='bandMin'||field==='bandMax') { s.band=s.band||[0,0]; s.band[field==='bandMin'?0:1]=Number(t.value); }
+        else if (['perBudget','value'].includes(field)) s[field]=Number(t.value);
+        else if (field==='max') s.max=t.value===''?undefined:Number(t.value);
+        else if (field==='hook') s.hook=t.value||undefined;
+        else if (field==='handler') s.handler=t.value||undefined;
+        else s[field]=t.value;
       }
+      function rekeyRecord(rec, oldK, newK, setId) { if(!newK||newK===oldK||rec[newK]) return false; const out={}; for(const [k,v] of Object.entries(rec)){if(k===oldK){setId(v,newK);out[newK]=v}else out[k]=v;} return out; }
+      function rekeySet(oldK, newK) { const r=rekeyRecord(state.sets,oldK,newK,(v,k)=>(v.id=k)); if(r){state.sets=r;render();} }
+      function rekeyStat(oldK, newK) { const r=rekeyRecord(state.stats,oldK,newK,(v,k)=>(v.id=k)); if(r){state.stats=r;render();} }
 
-      // rekey helpers preserve insertion order
-      function rekeyRecord(rec, oldK, newK, setId) {
-        if (!newK || newK === oldK || rec[newK]) return false;
-        const out = {};
-        for (const [k, v] of Object.entries(rec)) { if (k === oldK) { setId(v, newK); out[newK] = v; } else out[k] = v; }
-        return out;
-      }
-      function rekeySet(oldK, newK) { const r = rekeyRecord(state.sets, oldK, newK, (v, k) => (v.id = k)); if (r) { state.sets = r; render(); } }
-      function rekeyStat(oldK, newK) { const r = rekeyRecord(state.stats, oldK, newK, (v, k) => (v.id = k)); if (r) { state.stats = r; render(); } }
-
-      // ---- toolbar --------------------------------------------------------
       $('add').addEventListener('click', () => {
-        if (tab === 'bases') state.bases.push({ id: uid('base', baseIds()), name: 'New Item', slot: 'hand1', primary: flatStatIds()[0], pool: [] });
-        else if (tab === 'sets') { const id = uid('set', setIds()); state.sets[id] = { id, name: 'New Set', rarity: 'rare', members: [], bonuses: [] }; }
-        else if (tab === 'uniques') state.uniques.push({ id: uid('uniq', state.uniques.map((u) => u.id)), name: 'New Unique', slot: 'hand1', base: baseIds()[0] || 'blade', rarity: 'legendary', dropWeight: 1, lines: [] });
-        else { const id = uid('stat', statIds()); state.stats[id] = { id, name: 'New Stat', abbr: 'NEW', target: DERIVED_IDS[0], op: 'flat', perBudget: 1, value: 1, kind: 'flat', implemented: false }; }
+        if (tab==='bases') state.bases.push({ id:uid('base',baseIds()), name:'New Item', slot:'hand1', primary:flatStatIds()[0], pool:[] });
+        else if (tab==='sets') { const id=uid('set',setIds()); state.sets[id]={ id, name:'New Set', rarity:'rare', items:[], bonuses:[] }; }
+        else if (tab==='uniques') state.uniques.push({ id:uid('uniq',state.uniques.map((u)=>u.id)), name:'New Unique', slot:'hand1', base:baseIds()[0]||'blade', rarity:'legendary', dropWeight:1, lines:[] });
+        else if (tab==='stats') { const id=uid('stat',statIds()); state.stats[id]={ id, name:'New Stat', abbr:'NEW', target:DERIVED_IDS[0], op:'flat', perBudget:1, value:1, kind:'flat', hook:'', handler:'', implemented:false }; }
         render();
       });
-      const uid = (p, existing) => { let n = 1, id = `${p}${n}`; while (existing.includes(id)) id = `${p}${++n}`; return id; };
-      $('reset').addEventListener('click', () => { if (confirm('Discard edits and reload committed content?')) { state = committed(); render(); } });
+      const uid = (p, existing) => { let n=1, id=`${p}${n}`; while(existing.includes(id)) id=`${p}${++n}`; return id; };
+      $('reset').addEventListener('click', () => { if(confirm('Discard all edits?')) { collapsed.clear(); state=committed(); render(); } });
       $('regen').addEventListener('click', render);
 
       render();

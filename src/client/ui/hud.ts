@@ -25,13 +25,17 @@ export interface HudSnapshot {
  *  equip slots + two locked placeholders = the eight-cell grid in the sketch. */
 const GEAR_SLOTS: Array<{ slot: GearSlot; icon: string; label: string }> = [
   { slot: 'hand1', icon: '⚔️', label: 'Weapon' },
-  { slot: 'body', icon: '👕', label: 'Armor' },
-  { slot: 'head', icon: '⛑️', label: 'Helm' },
-  { slot: 'feet', icon: '🥾', label: 'Boots' },
+  { slot: 'hand2', icon: '🛡️', label: 'Off-hand' },
+  { slot: 'body',  icon: '👕', label: 'Armor' },
+  { slot: 'head',  icon: '⛑️', label: 'Helm' },
+  { slot: 'legs',  icon: '👖', label: 'Legs' },
+  { slot: 'feet',  icon: '🥾', label: 'Boots' },
+  { slot: 'belt',  icon: '🎗️', label: 'Belt' },
   { slot: 'ring1', icon: '💍', label: 'Ring' },
+  { slot: 'ring2', icon: '💍', label: 'Ring 2' },
   { slot: 'amulet', icon: '📿', label: 'Amulet' },
 ];
-const LOCKED_SLOTS = 2;
+const LOCKED_SLOTS = 0;
 const SKILL_SLOTS = 5;
 
 const RARITY_COLORS: Record<string, string> = {
