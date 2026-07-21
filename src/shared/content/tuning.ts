@@ -20,6 +20,20 @@ export interface MonsterTuning {
   xpPerDepth: number;
   baseGold: number;
   goldPerDepth: number;
+  /** Base chance (0..1) a non-boss spawn is elite. */
+  eliteChance: number;
+  /** Extra elite chance per depth (additive). */
+  eliteChancePerDepth: number;
+  /** Multipliers by rarity tier for stats and rewards. */
+  eliteHpMult: number;
+  eliteAtkMult: number;
+  eliteRewardMult: number;
+  bossHpMult: number;
+  bossAtkMult: number;
+  bossRewardMult: number;
+  /** Budget for rolling passive stat values. */
+  passiveBudgetBase: number;
+  passiveBudgetPerDepth: number;
 }
 
 export interface CombatTuning {
@@ -97,6 +111,17 @@ export const TUNING: Tuning = {
     xpPerDepth: 2,
     baseGold: 3,
     goldPerDepth: 2,
+    // Monster rarity system
+    eliteChance: 0.05,
+    eliteChancePerDepth: 0.001,
+    eliteHpMult: 3.5,
+    eliteAtkMult: 1.5,
+    eliteRewardMult: 4.0,
+    bossHpMult: 10.0,
+    bossAtkMult: 2.5,
+    bossRewardMult: 12.0,
+    passiveBudgetBase: 4,
+    passiveBudgetPerDepth: 0.3,
   },
   combat: {
     attackIntervalMs: 600,

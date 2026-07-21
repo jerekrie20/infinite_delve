@@ -84,7 +84,16 @@ export type DerivedId =
   | 'hpRegen'
   | 'hpRegenPct'
   | 'goldFindPct'
-  | 'healOnKillPct';
+  | 'healOnKillPct'
+  // Behavioral stats flipped live for monster passives
+  | 'doubleStrikeChance'
+  | 'executeThreshold'
+  | 'armorPierce'
+  | 'counterAttackPct'
+  | 'reviveChance'
+  | 'critHeal'
+  | 'explodeOnKill'
+  | 'blockChance';
 
 export const DERIVED_IDS: DerivedId[] = [
   'attack', 'maxHp', 'defensePct',
@@ -93,6 +102,9 @@ export const DERIVED_IDS: DerivedId[] = [
   'lifestealPct', 'dodgeChance', 'thornsPct',
   'hpRegen', 'hpRegenPct',
   'goldFindPct', 'healOnKillPct',
+  'doubleStrikeChance', 'executeThreshold', 'armorPierce',
+  'counterAttackPct', 'reviveChance', 'critHeal', 'explodeOnKill',
+  'blockChance',
 ];
 
 /** Named combat hook points. A behavioral stat declares which one fires it. */
@@ -200,9 +212,8 @@ export const STATS: Record<StatId, StatDef> = {
   },
   doubleStrikeChance: {
     id: 'doubleStrikeChance', name: 'Double Strike', abbr: 'DBL', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.2, value: 8,
+    target: 'doubleStrikeChance', op: 'flat', perBudget: 0.2, value: 8,
     kind: 'behavioral', max: 25, hook: 'onAttack', handler: 'doubleStrike',
-    implemented: false,
   },
   cleavePct: {
     id: 'cleavePct', name: 'Cleave', abbr: 'CLV', pct: true,
@@ -212,9 +223,8 @@ export const STATS: Record<StatId, StatDef> = {
   },
   executeThreshold: {
     id: 'executeThreshold', name: 'Execute', abbr: 'EXEC', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.15, value: 8,
+    target: 'executeThreshold', op: 'flat', perBudget: 0.15, value: 8,
     kind: 'behavioral', max: 20, hook: 'onAttack', handler: 'executeKill',
-    implemented: false,
   },
   poisonChance: {
     id: 'poisonChance', name: 'Poison Chance', abbr: 'PSN', pct: true,
@@ -230,9 +240,8 @@ export const STATS: Record<StatId, StatDef> = {
   },
   armorPierce: {
     id: 'armorPierce', name: 'Armor Pierce', abbr: 'PIERCE', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.3, value: 5,
+    target: 'armorPierce', op: 'flat', perBudget: 0.3, value: 5,
     kind: 'behavioral', max: 40, hook: 'onAttack', handler: 'ignoreDefense',
-    implemented: false,
   },
   accuracy: {
     id: 'accuracy', name: 'Accuracy', abbr: 'ACC',
@@ -255,9 +264,8 @@ export const STATS: Record<StatId, StatDef> = {
   },
   blockChance: {
     id: 'blockChance', name: 'Block Chance', abbr: 'BLOCK', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.2, value: 5,
+    target: 'blockChance', op: 'flat', perBudget: 0.2, value: 5,
     kind: 'behavioral', max: 35, hook: 'onTakeDamage', handler: 'blockRoll',
-    implemented: false,
   },
   blockAmount: {
     id: 'blockAmount', name: 'Block Amt', abbr: 'BLK',
@@ -267,9 +275,8 @@ export const STATS: Record<StatId, StatDef> = {
   },
   counterAttackPct: {
     id: 'counterAttackPct', name: 'Counter Atk', abbr: 'CNTR', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.3, value: 6,
+    target: 'counterAttackPct', op: 'flat', perBudget: 0.3, value: 6,
     kind: 'behavioral', max: 40, hook: 'onTakeDamage', handler: 'counterAttack',
-    implemented: false,
   },
   blockHeal: {
     id: 'blockHeal', name: 'Block Heal', abbr: 'BLK+', pct: true,
@@ -279,15 +286,13 @@ export const STATS: Record<StatId, StatDef> = {
   },
   critHeal: {
     id: 'critHeal', name: 'Crit Heal', abbr: 'CRIT+', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.25, value: 6,
+    target: 'critHeal', op: 'flat', perBudget: 0.25, value: 6,
     kind: 'behavioral', max: 20, hook: 'onCrit', handler: 'critHealEffect',
-    implemented: false,
   },
   reviveChance: {
     id: 'reviveChance', name: 'Revive', abbr: 'REV', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.08, value: 12,
+    target: 'reviveChance', op: 'flat', perBudget: 0.08, value: 12,
     kind: 'behavioral', max: 10, hook: 'onTakeDamage', handler: 'reviveRoll',
-    implemented: false,
   },
   shieldLeechPct: {
     id: 'shieldLeechPct', name: 'Shield Leech', abbr: 'SHLD', pct: true,
@@ -312,9 +317,8 @@ export const STATS: Record<StatId, StatDef> = {
   },
   explodeOnKill: {
     id: 'explodeOnKill', name: 'Explode', abbr: 'XPLD', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.3, value: 6,
+    target: 'explodeOnKill', op: 'flat', perBudget: 0.3, value: 6,
     kind: 'behavioral', max: 40, hook: 'onKill', handler: 'explodeAoE',
-    implemented: false,
   },
   hpRegen: {
     id: 'hpRegen', name: 'HP Regen', abbr: 'HP/s',

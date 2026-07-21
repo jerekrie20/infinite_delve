@@ -124,7 +124,7 @@ export const AFFIXES_BY_RARITY: Record<Rarity, number> = {
 const pick = <T>(arr: T[], rng: Rng): T => arr[Math.floor(rng() * arr.length)]!;
 
 /** Draw up to n distinct items from arr (no replacement), seeded by rng. */
-function pickN<T>(arr: T[], n: number, rng: Rng): T[] {
+export function pickN<T>(arr: T[], n: number, rng: Rng): T[] {
   const copy = [...arr];
   const out: T[] = [];
   const count = Math.min(n, copy.length);
@@ -160,7 +160,7 @@ function pctValue(stat: StatId, rarityMult: number, rng: Rng): number {
 }
 
 /** Roll one affix stat's contribution, honoring its combine op. */
-const affixValue = (stat: StatId, budget: number, rarityMult: number, rng: Rng): number =>
+export const affixValue = (stat: StatId, budget: number, rarityMult: number, rng: Rng): number =>
   STATS[stat].op === 'pct' ? pctValue(stat, rarityMult, rng) : statValue(budget, stat);
 
 const newId = (rng: Rng): string => `itm_${Math.floor(rng() * 1e12).toString(36)}`;

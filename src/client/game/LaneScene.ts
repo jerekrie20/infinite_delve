@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { GearItem, GearSlot, Hero } from '../../shared/delve';
+import type { GearItem, GearSlot, Hero, MonsterRarity } from '../../shared/delve';
 import { monsterForDepth, type IdleGains, type MonsterKind } from '../../shared/waves';
 import { TUNING } from '../../shared/content/tuning';
 import { itemName, rollDrop, sellValue } from '../../shared/content/items';
@@ -38,6 +38,8 @@ const HERO_SPEC: CharSpec = { key: 'hero', originX: 0.5331, originY: 0.875, nati
 const MONSTER_SPECS: Record<MonsterKind, CharSpec> = {
   grunt: { key: 'goblin', originX: 0.5147, originY: 0.8824, nativeH: 101, displayH: 124 },
   swarm: { key: 'rat', originX: 0.5221, originY: 0.8676, nativeH: 97, displayH: 140 },
+  brute: { key: 'goblin', originX: 0.5147, originY: 0.8824, nativeH: 101, displayH: 140 },
+  caster: { key: 'goblin', originX: 0.5147, originY: 0.8824, nativeH: 101, displayH: 124 },
 };
 const specScale = (s: CharSpec): number => s.displayH / s.nativeH;
 
@@ -53,6 +55,12 @@ const SET_COLOR = '#2ecf7f';
 const UNIQUE_COLOR = '#ff8a3d';
 const itemColor = (it: GearItem): string =>
   it.unique ? UNIQUE_COLOR : it.set ? SET_COLOR : RARITY_COLORS[it.r] ?? '#ffffff';
+
+const MONSTER_RARITY_COLORS: Record<MonsterRarity, string> = {
+  normal: '#ffffff',
+  elite: '#4aa3ff',
+  boss: '#ffb020',
+};
 
 interface Combatant {
   hp: number;
@@ -134,6 +142,8 @@ export class LaneScene extends Phaser.Scene {
   private monster!: Combatant;
   private heroDerived!: Record<string, number>;
   private heroBehaviors!: ReturnType<typeof behavioralStats>;
+  private monsterBehaviors!: ReturnType<typeof behavioralStats>;
+  private monsterRarity: MonsterRarity = 'normal';
   private depth = 1;
   private runGold = 0;
   private runHaul: GearItem[] = [];
@@ -141,6 +151,7 @@ export class LaneScene extends Phaser.Scene {
   private pendingIdle?: IdleGains;
   private over = false;
   private tickAccum = 0;
+  private monsterRevived = false;
 
   private heroSprite!: Phaser.GameObjects.Image;
   private monsterSprite!: Phaser.GameObjects.Image;
@@ -151,11 +162,24 @@ export class LaneScene extends Phaser.Scene {
   private haulText!: Phaser.GameObjects.Text;
   private attackTimer = ATTACK_INTERVAL_MS;
 
+  /** Enable verbose combat logging in the browser console. Activate with ?debug=1
+   *  in the URL, or set localStorage['delve_debug'] = '1'. */
+  private debug = false;
+
+  private debugLog(side: 'hero' | 'monster', event: string, detail: string, style?: string): void {
+    if (!this.debug) return;
+    const tag = side === 'hero' ? '🟢' : '🔴';
+    const s = style ?? (side === 'hero' ? 'color:#5bd06a' : 'color:#ff5470');
+    console.log(`%c[${this.depth}] ${tag} ${event} %c${detail}`, s, 'color:#9d8fc0');
+  }
+
   constructor() {
     super('LaneScene');
   }
 
   init(data: { hero?: Hero; idle?: IdleGains }): void {
+    this.debug = new URLSearchParams(window.location.search).has('debug')
+      || globalThis.localStorage?.getItem('delve_debug') === '1';
     this.hero = data.hero ?? {
       class: 'squire', level: 1, xp: 0, xpToNext: 20, hp: 40, maxHp: 40,
       attack: 6, defense: 5, critChance: TUNING.combat.critChance * 100,
@@ -229,18 +253,25 @@ export class LaneScene extends Phaser.Scene {
     }
   }
 
-  // ---- per-frame auto-battle -------------------------------------------------
+  // ---- per-frame auto-battle (symmetric — both sides dispatch behaviors) ------
 
   override update(_time: number, delta: number): void {
     if (this.over) return;
 
-    // perTick: HP regen accumulates every frame
+    // perTick: HP regen for both combatants
     this.tickAccum += delta;
     if (this.tickAccum >= 1000) {
       this.tickAccum -= 1000;
+      // Hero regen
       const tick = dispatchHook('perTick', this.heroBehaviors, 0, this.heroC, this.monster);
       if (tick.regen && this.heroC.hp > 0 && this.heroC.hp < this.heroC.maxHp) {
         this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + tick.regen);
+      }
+      // Monster regen
+      const monTick = dispatchHook('perTick', this.monsterBehaviors, 0, this.monster, this.heroC);
+      if (monTick.regen && this.monster.hp > 0 && this.monster.hp < this.monster.maxHp) {
+        this.monster.hp = Math.min(this.monster.maxHp, this.monster.hp + monTick.regen);
+        this.debugLog('monster', 'regen', `+${monTick.regen} → ${this.monster.hp}/${this.monster.maxHp}`);
       }
     }
 
@@ -248,101 +279,218 @@ export class LaneScene extends Phaser.Scene {
     if (this.attackTimer > 0) return;
     this.attackTimer = ATTACK_INTERVAL_MS;
 
-    // ── Hero attacks the monster ──
-    // onAttack: execute, double-strike, armor-pierce, accuracy
-    const onAtk = dispatchHook('onAttack', this.heroBehaviors, 0, this.heroC, this.monster);
-    if (onAtk.dead) {
-      this.monster.hp = 0;
+    this.doHeroAttack();
+    if (this.monster.hp <= 0) {
       this.onMonsterDead();
       this.refreshHud();
       return;
     }
+    this.doMonsterAttack();
+    if (this.heroC.hp <= 0) {
+      // Last-chance: hero revive
+      const onLethal = dispatchHook('onTakeDamage', this.heroBehaviors, 1, this.heroC, this.monster);
+      if (onLethal.heal) {
+        this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onLethal.heal);
+        this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, 'REVIVED!', '#ffe066');
+        this.debugLog('hero', '💀REVIVE', `back to ${this.heroC.hp}/${this.heroC.maxHp}!`, 'color:#ffe066;font-weight:bold');
+      } else {
+        this.debugLog('hero', '☠️ DIED', `at depth ${this.depth}`, 'color:#ff5470;font-weight:bold');
+        this.die();
+        return;
+      }
+    }
+    this.refreshHud();
+  }
+
+  /** Hero attack phase, with symmetric monster onTakeDamage dispatch. */
+  private doHeroAttack(): void {
+    const onAtk = dispatchHook('onAttack', this.heroBehaviors, 0, this.heroC, this.monster);
+    if (onAtk.dead) { this.monster.hp = 0; this.debugLog('hero', '⚡EXEC', 'instant kill!', 'color:#ffd84a;font-weight:bold'); return; }
+    if ((onAtk.extraDmg ?? 0) > 0) this.debugLog('hero', 'pierce', `+${onAtk.extraDmg} bonus`);
+    if (onAtk.extraDmg === -1) this.debugLog('hero', 'double', 'roll!', 'color:#ffd84a');
     const effectiveAtk = this.heroC.attack + (onAtk.extraDmg ?? 0);
 
     const hit = rollDamage(effectiveAtk, this.monster.defense, this.heroC.critChance, this.heroC.critMultiplier);
+
+    // Monster defenses: dodge, block
+    const monDef = dispatchHook('onTakeDamage', this.monsterBehaviors, hit.dmg, this.monster, this.heroC);
+    if (monDef.dodged) {
+      this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, 'DODGE', '#ffe066');
+      this.debugLog('monster', 'DODGE', `evaded ${hit.dmg}`, 'color:#ffe066');
+      if (monDef.counterDmg) {
+        this.heroC.hp -= monDef.counterDmg;
+        this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `${monDef.counterDmg}`, '#ff6b6b');
+        this.debugLog('monster', 'counter', `${monDef.counterDmg} → hero`, 'color:#ff8a3d');
+      }
+      return;
+    }
+    if (monDef.blocked) {
+      this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, 'BLOCK', '#4aa3ff');
+      this.debugLog('monster', 'BLOCK', `negated ${hit.dmg}`, 'color:#4aa3ff');
+      return;
+    }
+
     this.monster.hp -= hit.dmg;
     this.hitFx(this.heroSprite, 1);
     this.floatNumber(
       MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24,
       hit.crit ? `${hit.dmg}!` : `${hit.dmg}`, hit.crit ? '#ffd84a' : '#ffffff'
     );
+    this.debugLog('hero', 'hit', `${hit.dmg}${hit.crit ? ' CRIT!' : ''} → ${Math.max(0, this.monster.hp)}/${this.monster.maxHp}`,
+      hit.crit ? 'color:#ffd84a;font-weight:bold' : undefined);
 
-    // onCrit: burst AoE, crit heal
+    // Monster thorns
+    if (monDef.reflect && this.heroC.hp > 0) {
+      this.heroC.hp -= monDef.reflect;
+      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `${monDef.reflect}`, '#ff6b6b');
+      this.debugLog('monster', 'thorns', `${monDef.reflect} reflect → hero`, 'color:#ff8a3d');
+    }
+
+    // Hero onCrit
     if (hit.crit) {
       const onCrit = dispatchHook('onCrit', this.heroBehaviors, hit.dmg, this.heroC, this.monster);
       if (onCrit.heal && this.heroC.hp < this.heroC.maxHp) {
         this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onCrit.heal);
         this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `+${onCrit.heal}`, '#7fe0a0');
+        this.debugLog('hero', 'critHeal', `+${onCrit.heal}`);
       }
     }
 
-    // onDealDamage: lifesteal, mana leech, shield leech, cleave
+    // Hero onDealDamage
     const onDmg = dispatchHook('onDealDamage', this.heroBehaviors, hit.dmg, this.heroC, this.monster);
     if (onDmg.heal && this.heroC.hp < this.heroC.maxHp) {
       this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onDmg.heal);
       this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `+${onDmg.heal}`, '#7fe0a0');
+      this.debugLog('hero', 'lifesteal', `+${onDmg.heal}`);
     }
 
-    // double-strike: repeat the attack (signalled by extraDmg = -1)
+    // Double-strike (signalled by extraDmg = -1)
     if (onAtk.extraDmg === -1 && this.monster.hp > 0) {
       const hit2 = rollDamage(effectiveAtk, this.monster.defense, this.heroC.critChance, this.heroC.critMultiplier);
-      this.monster.hp -= hit2.dmg;
+      const monDef2 = dispatchHook('onTakeDamage', this.monsterBehaviors, hit2.dmg, this.monster, this.heroC);
+      if (!monDef2.dodged && !monDef2.blocked) {
+        this.monster.hp -= hit2.dmg;
+        this.debugLog('hero', 'double!', `${hit2.dmg} → ${Math.max(0, this.monster.hp)}/${this.monster.maxHp}`, 'color:#ffd84a;font-weight:bold');
+      }
       const onDmg2 = dispatchHook('onDealDamage', this.heroBehaviors, hit2.dmg, this.heroC, this.monster);
       if (onDmg2.heal && this.heroC.hp < this.heroC.maxHp) {
         this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onDmg2.heal);
       }
     }
+  }
 
-    if (this.monster.hp <= 0) {
-      this.onMonsterDead();
-      this.refreshHud();
+  /** Monster attack phase, with symmetric onAttack/onDealDamage dispatch. */
+  private doMonsterAttack(): void {
+    // Monster onAttack: doubleStrike, execute, armor pierce
+    const monAtk = dispatchHook('onAttack', this.monsterBehaviors, 0, this.monster, this.heroC);
+    if (monAtk.dead) { this.heroC.hp = 0; this.debugLog('monster', '⚡EXEC', 'hero slain!', 'color:#ffd84a;font-weight:bold'); return; }
+    if ((monAtk.extraDmg ?? 0) > 0) this.debugLog('monster', 'pierce', `+${monAtk.extraDmg} bonus`);
+    if (monAtk.extraDmg === -1) this.debugLog('monster', 'double', 'roll!', 'color:#ffd84a');
+    const monEffAtk = this.monster.attack + (monAtk.extraDmg ?? 0);
+
+    // Monster uses rollDamage (crits too)
+    const monHit = rollDamage(monEffAtk, this.heroC.defense, this.monster.critChance, this.monster.critMultiplier);
+
+    // Hero defenses: dodge, block, thorns
+    const heroDef = dispatchHook('onTakeDamage', this.heroBehaviors, monHit.dmg, this.heroC, this.monster);
+    if (heroDef.dodged) {
+      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, 'DODGE', '#ffe066');
+      this.debugLog('hero', 'DODGE', `evaded ${monHit.dmg}`, 'color:#ffe066');
+      if (heroDef.counterDmg) {
+        this.monster.hp -= heroDef.counterDmg;
+        this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, `${heroDef.counterDmg}`, '#ffd84a');
+        this.debugLog('hero', 'counter', `${heroDef.counterDmg} → monster`, 'color:#ffd84a');
+      }
+      return;
+    }
+    if (heroDef.blocked) {
+      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, 'BLOCK', '#4aa3ff');
+      this.debugLog('hero', 'BLOCK', `negated ${monHit.dmg}`, 'color:#4aa3ff');
       return;
     }
 
-    // ── Monster strikes back ──
-    let backDmg = this.monster.attack * (1 - this.heroC.defense / 100);
-    backDmg *= 1 - TUNING.combat.damageVariance + Math.random() * (2 * TUNING.combat.damageVariance);
-    backDmg = Math.max(1, Math.round(backDmg));
+    this.heroC.hp -= monHit.dmg;
+    this.hitFx(this.monsterSprite, -1);
+    this.floatNumber(
+      HERO_X, GROUND_Y - HERO_SPEC.displayH - 24,
+      monHit.crit ? `${monHit.dmg}!` : `${monHit.dmg}`, monHit.crit ? '#ff6b6b' : '#ff6b6b'
+    );
+    this.debugLog('monster', 'hit', `${monHit.dmg}${monHit.crit ? ' CRIT!' : ''} → ${Math.max(0, this.heroC.hp)}/${this.heroC.maxHp}`,
+      monHit.crit ? 'color:#ff6b6b;font-weight:bold' : undefined);
 
-    // onTakeDamage: dodge, thorns, block, counter-attack
-    const onTaken = dispatchHook('onTakeDamage', this.heroBehaviors, backDmg, this.heroC, this.monster);
-    if (onTaken.dodged) {
-      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, 'DODGE', '#ffe066');
-      if (onTaken.counterDmg) {
-        this.monster.hp -= onTaken.counterDmg;
-        this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, `${onTaken.counterDmg}`, '#ffd84a');
-      }
-    } else {
-      this.heroC.hp -= backDmg;
-      this.hitFx(this.monsterSprite, -1);
-      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `${backDmg}`, '#ff6b6b');
-      if (onTaken.reflect && this.monster.hp > 0) {
-        this.monster.hp -= onTaken.reflect;
-        this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, `${onTaken.reflect}`, '#ffd84a');
+    // Hero thorns
+    if (heroDef.reflect && this.monster.hp > 0) {
+      this.monster.hp -= heroDef.reflect;
+      this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, `${heroDef.reflect}`, '#ffd84a');
+      this.debugLog('hero', 'thorns', `${heroDef.reflect} reflect → monster`, 'color:#ffd84a');
+    }
+
+    // Monster onDealDamage: lifesteal
+    const monDmg = dispatchHook('onDealDamage', this.monsterBehaviors, monHit.dmg, this.monster, this.heroC);
+    if (monDmg.heal && this.monster.hp < this.monster.maxHp) {
+      this.monster.hp = Math.min(this.monster.maxHp, this.monster.hp + monDmg.heal);
+      this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, `+${monDmg.heal}`, '#7fe0a0');
+      this.debugLog('monster', 'lifesteal', `+${monDmg.heal}`);
+    }
+
+    // Monster crit heal
+    if (monHit.crit) {
+      const monCrit = dispatchHook('onCrit', this.monsterBehaviors, monHit.dmg, this.monster, this.heroC);
+      if (monCrit.heal && this.monster.hp < this.monster.maxHp) {
+        this.monster.hp = Math.min(this.monster.maxHp, this.monster.hp + monCrit.heal);
+        this.debugLog('monster', 'critHeal', `+${monCrit.heal}`);
       }
     }
 
-    if (this.heroC.hp <= 0) {
-      // Last-chance: revive
-      const onLethal = dispatchHook('onTakeDamage', this.heroBehaviors, backDmg, this.heroC, this.monster);
-      if (onLethal.heal) {
-        this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onLethal.heal);
-        this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, 'REVIVED!', '#ffe066');
-      } else {
-        this.die();
+    // Monster double-strike
+    if (monAtk.extraDmg === -1 && this.heroC.hp > 0) {
+      const monHit2 = rollDamage(monEffAtk, this.heroC.defense, this.monster.critChance, this.monster.critMultiplier);
+      const heroDef2 = dispatchHook('onTakeDamage', this.heroBehaviors, monHit2.dmg, this.heroC, this.monster);
+      if (!heroDef2.dodged && !heroDef2.blocked) {
+        this.heroC.hp -= monHit2.dmg;
+        this.debugLog('monster', 'double!', `${monHit2.dmg} → ${Math.max(0, this.heroC.hp)}/${this.heroC.maxHp}`, 'color:#ffd84a;font-weight:bold');
+      }
+      const monDmg2 = dispatchHook('onDealDamage', this.monsterBehaviors, monHit2.dmg, this.monster, this.heroC);
+      if (monDmg2.heal && this.monster.hp < this.monster.maxHp) {
+        this.monster.hp = Math.min(this.monster.maxHp, this.monster.hp + monDmg2.heal);
       }
     }
-    this.refreshHud();
   }
 
   private onMonsterDead(): void {
     const m = monsterForDepth(this.depth);
 
-    // onKill: heal on kill, explode, gold find, XP bonus
+    // Monster onKill: explode (hurts hero)
+    const monOnKill = dispatchHook('onKill', this.monsterBehaviors, m.hp, this.monster, this.heroC);
+    if (monOnKill.extraDmg && this.heroC.hp > 0) {
+      this.heroC.hp -= monOnKill.extraDmg;
+      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `${monOnKill.extraDmg}`, '#ff8a3d');
+      this.debugLog('monster', '💥EXPLODE', `${monOnKill.extraDmg} → hero`, 'color:#ff8a3d;font-weight:bold');
+    }
+
+    // Monster revive: refill HP, don't advance depth
+    if (!this.monsterRevived) {
+      // Check for revive ONLY on first death (reviveRoll handler returns {heal})
+      const monDie = dispatchHook('onTakeDamage', this.monsterBehaviors, 1, this.monster, this.heroC);
+      if (monDie.heal) {
+        this.monster.hp = Math.min(this.monster.maxHp, monDie.heal);
+        this.monsterRevived = true;
+        this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 24, 'REVIVED!', '#ffe066');
+        this.debugLog('monster', '💀REVIVE', `back to ${this.monster.hp}/${this.monster.maxHp}!`, 'color:#ffe066;font-weight:bold');
+        this.tweens.add({
+          targets: this.monsterSprite, scale: specScale(this.monsterSpec) * (this.monsterRarity === 'boss' ? 1.3 : 1),
+          duration: 300, ease: 'Back.out',
+        });
+        return;
+      }
+    }
+
+    // Hero onKill: heal on kill, gold find, XP bonus
     const onKill = dispatchHook('onKill', this.heroBehaviors, m.hp, this.heroC, this.monster);
     if (onKill.heal && this.heroC.hp < this.heroC.maxHp) {
       this.heroC.hp = Math.min(this.heroC.maxHp, this.heroC.hp + onKill.heal);
       this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, `+${onKill.heal}`, '#5bd06a');
+      this.debugLog('hero', 'healOnKill', `+${onKill.heal} → ${this.heroC.hp}/${this.heroC.maxHp}`);
     }
 
     const goldMult = 1 + (onKill.bonusGold ?? 0) / 100;
@@ -483,19 +631,42 @@ export class LaneScene extends Phaser.Scene {
 
   private spawnMonster(): void {
     const m = monsterForDepth(this.depth);
+    this.monsterRarity = m.rarity;
+    this.monsterRevived = false;
     this.monster = {
       hp: m.hp, maxHp: m.hp, attack: m.attack, defense: m.defense,
       critChance: TUNING.combat.critChance * 100, critMultiplier: TUNING.combat.critMultiplier,
       lifesteal: 0, dodge: 0, hpRegen: 0, goldFind: 0,
     };
+    // Build monster behaviors from rolled passives (same path as hero behaviors).
+    this.monsterBehaviors = behavioralStats(m.passives as Record<string, number>);
+    // Dispatch onCombatStart for both sides.
+    const onStart = dispatchHook('onCombatStart', this.monsterBehaviors, 0, this.monster, this.heroC);
+    if (onStart.extraDmg && this.heroC.hp > 0) {
+      this.heroC.hp -= onStart.extraDmg;
+    }
     const spec = MONSTER_SPECS[m.kind];
     this.monsterSpec = spec;
-    const scale = specScale(spec);
+    const bossScale = m.rarity === 'boss' ? 1.3 : 1.0;
+    const scale = specScale(spec) * bossScale;
     this.monsterSprite
       .setTexture(spec.key)
       .setOrigin(spec.originX, spec.originY)
-      .setScale(scale * 0.6);
+      .setScale(scale * 0.6)
+      .setTint(m.rarity === 'elite' ? 0x4aa3ff : m.rarity === 'boss' ? 0xffb020 : 0xffffff);
     this.tweens.add({ targets: this.monsterSprite, scale, duration: 220, ease: 'Back.out' });
+    // Name label
+    this.floatNumber(MONSTER_X, GROUND_Y - this.monsterSpec.displayH - 55, m.name, MONSTER_RARITY_COLORS[m.rarity]);
+
+    // Debug: log spawn
+    if (this.debug) {
+      const pList = Object.entries(m.passives).map(([s, v]) => {
+        const d = STATS[s as StatId];
+        return `${d?.abbr ?? s}:${v}${d?.pct ? '%' : ''}`;
+      }).join(' ');
+      this.debugLog('monster', 'SPAWN', `${m.name} (${m.rarity}) hp=${m.hp} atk=${m.attack} def=${m.defense}${pList ? ' [' + pList + ']' : ''}`,
+        'color:#ffb020;font-weight:bold');
+    }
   }
 
   private refreshHud(): void {

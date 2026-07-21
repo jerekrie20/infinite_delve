@@ -23,6 +23,8 @@ export type GearSlot =
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
+export type MonsterRarity = 'normal' | 'elite' | 'boss';
+
 /** Stat bonuses a piece of gear grants while equipped — a sparse map over the
  *  stat registry (only the stats this item rolled are present). */
 export type GearStats = Partial<Record<StatId, number>>;
@@ -105,7 +107,7 @@ export interface Point {
   y: number;
 }
 
-export type MonsterKind = 'grunt' | 'swarm';
+export type MonsterKind = 'grunt' | 'swarm' | 'brute' | 'caster';
 
 export interface Monster {
   id: string;

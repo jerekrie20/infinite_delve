@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Combat Sim — Infinite Delve</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, sans-serif; background: #17111f; color: #ece7f5; }
+  header {
+    display: flex; gap: 8px; align-items: center; padding: 10px 14px;
+    background: #1c1430; border-bottom: 1px solid rgba(255,255,255,0.12); flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; margin: 0 6px 0 0; white-space: nowrap; }
+  button {
+    padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08); color: #fff; cursor: pointer; font-size: 15px; white-space: nowrap;
+  }
+  button:hover { background: rgba(255,255,255,0.16); }
+  button.run { background: #37b04f; border-color: #37b04f; font-weight: bold; }
+  button.step { background: #4aa3ff; border-color: #4aa3ff; }
+  button.reset { background: #ff5470; border-color: #ff5470; }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  .layout { display: grid; grid-template-columns: 340px 1fr; height: calc(100vh - 54px); overflow: hidden; }
+  .panel { overflow-y: auto; padding: 14px 16px; }
+  .panel.left { border-right: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.12); }
+
+  h2 { font-size: 14px; color: #9d8fc0; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  h3 { font-size: 13px; color: #b7aed0; margin: 12px 0 6px; }
+
+  .form-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .form-row label { width: 75px; font-size: 14px; color: #9d8fc0; text-align: right; flex-shrink: 0; }
+  .form-row input, .form-row select {
+    width: 120px; padding: 5px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.18);
+    background: #120c1c; color: #fff; font-size: 15px;
+  }
+  .form-row input:focus { border-color: #4aa3ff; outline: none; }
+  .presets { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 10px; }
+  .preset {
+    padding: 3px 8px; border-radius: 6px; font-size: 13px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); color: #9d8fc0;
+  }
+  .preset:hover { background: rgba(74,163,255,0.15); color: #fff; }
+
+  /* HP bars */
+  .bars-section { margin: 10px 0; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .bar-label { width: 48px; font-size: 14px; font-weight: bold; }
+  .bar-label.hero { color: #5bd06a; }
+  .bar-label.monster { color: #ff5470; }
+  .bar-track { flex: 1; height: 22px; background: #2a1a2a; border-radius: 6px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; border-radius: 6px; transition: width 0.15s ease; }
+  .bar-fill.hero { background: linear-gradient(90deg, #3a9540, #5bd06a); }
+  .bar-fill.monster { background: linear-gradient(90deg, #c43040, #ff5470); }
+  .bar-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000; }
+
+  /* Monster info card */
+  .monster-card {
+    padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(0,0,0,0.2); margin-bottom: 10px;
+  }
+  .monster-card .name { font-size: 15px; font-weight: bold; }
+  .monster-card .name.boss { color: #ffb020; }
+  .monster-card .name.elite { color: #4aa3ff; }
+  .monster-card .meta { font-size: 13px; color: #9d8fc0; margin-top: 2px; }
+  .passive-tag {
+    display: inline-block; padding: 2px 7px; border-radius: 4px; margin: 2px 3px 2px 0;
+    font-size: 13px; background: rgba(255,176,32,0.15); color: #ffb020; border: 1px solid rgba(255,176,32,0.25);
+  }
+
+  /* Combat log */
+  .log { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.6; }
+  .log-entry { padding: 2px 6px; border-radius: 3px; margin: 1px 0; }
+  .log-entry.hero { color: #5bd06a; }
+  .log-entry.monster { color: #ff5470; }
+  .log-entry.proc { color: #ffb020; }
+  .log-entry.system { color: #9d8fc0; }
+  .log-entry.crit { color: #ffd84a; font-weight: bold; }
+
+  .result-banner {
+    padding: 10px 14px; border-radius: 8px; margin-top: 8px; font-weight: bold; font-size: 15px;
+  }
+  .result-banner.hero { background: rgba(91,208,106,0.15); color: #5bd06a; border: 1px solid rgba(91,208,106,0.3); }
+  .result-banner.monster { background: rgba(255,84,112,0.15); color: #ff5470; border: 1px solid rgba(255,84,112,0.3); }
+
+  .proc-summary { font-size: 14px; margin-top: 6px; }
+  .proc-summary span { margin-right: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚔️ Combat Sim</h1>
+  <button class="run" id="btn-run" title="Auto-run to completion">▶ Run</button>
+  <button class="step" id="btn-step">⏭ Step</button>
+  <button class="reset" id="btn-reset">↺ Reset</button>
+  <span style="margin-left:8px;font-size:14px;color:#9d8fc0">Speed:</span>
+  <select id="speed" style="padding:4px 8px;border-radius:6px;background:#120c1c;color:#fff;border:1px solid rgba(255,255,255,0.18);font-size:14px">
+    <option value="0">Instant</option>
+    <option value="200">Fast</option>
+    <option value="600" selected>Normal</option>
+    <option value="1500">Slow</option>
+  </select>
+  <span id="tick-counter" style="margin-left:auto;font-size:14px;color:#9d8fc0">Tick 0</span>
+</header>
+
+<div class="layout">
+  <!-- Left panel: config -->
+  <div class="panel left">
+    <h2>⚔️ Hero</h2>
+    <div class="presets">
+      <span class="preset" data-atk="6" data-def="5" data-hp="40" data-crit="5" data-ls="0" data-dodge="0" data-regen="0">Fresh Squire</span>
+      <span class="preset" data-atk="14" data-def="12" data-hp="100" data-crit="5" data-ls="3" data-dodge="5" data-regen="2">Mid Gear</span>
+      <span class="preset" data-atk="30" data-def="25" data-hp="250" data-crit="12" data-ls="8" data-dodge="10" data-regen="5">Geared</span>
+      <span class="preset" data-atk="60" data-def="40" data-hp="500" data-crit="20" data-ls="15" data-dodge="20" data-regen="12">Endgame</span>
+    </div>
+    <div class="form-row"><label>ATK</label><input id="hero-atk" type="number" value="14" min="1"></div>
+    <div class="form-row"><label>DEF %</label><input id="hero-def" type="number" value="12" min="0" max="75"></div>
+    <div class="form-row"><label>HP</label><input id="hero-hp" type="number" value="100" min="1"></div>
+    <div class="form-row"><label>Crit %</label><input id="hero-crit" type="number" value="5" min="0" max="100"></div>
+    <div class="form-row"><label>Lifesteal %</label><input id="hero-ls" type="number" value="3" min="0" max="100"></div>
+    <div class="form-row"><label>Dodge %</label><input id="hero-dodge" type="number" value="5" min="0" max="100"></div>
+    <div class="form-row"><label>HP Regen</label><input id="hero-regen" type="number" value="2" min="0"></div>
+
+    <h2>🗺️ Depth</h2>
+    <div class="form-row"><label>Depth</label><input id="depth" type="number" value="5" min="1" max="100"></div>
+    <div style="font-size:13px;color:#9d8fc0;margin-top:2px">
+      Boss at 5,10,19,20,29 · Elite chance ~5%+depth/1000
+    </div>
+
+    <div class="monster-card" id="monster-card" style="margin-top:14px">
+      <div class="name" id="mon-name">—</div>
+      <div class="meta" id="mon-meta"></div>
+      <div id="mon-passives"></div>
+    </div>
+  </div>
+
+  <!-- Right panel: combat -->
+  <div class="panel" style="display:flex;flex-direction:column">
+    <div class="bars-section">
+      <div class="bar-row">
+        <span class="bar-label hero">HERO</span>
+        <div class="bar-track"><div class="bar-fill hero" id="hero-bar" style="width:100%"></div><div class="bar-text" id="hero-bar-text">100 / 100</div></div>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label monster">MON</span>
+        <div class="bar-track"><div class="bar-fill monster" id="mon-bar" style="width:100%"></div><div class="bar-text" id="mon-bar-text">—</div></div>
+      </div>
+    </div>
+
+    <div id="result-area"></div>
+
+    <h3 style="margin:8px 0 4px">📜 Combat Log</h3>
+    <div class="log" id="log" style="flex:1;overflow-y:auto;background:rgba(0,0,0,0.15);border-radius:8px;padding:8px;min-height:200px">
+      <div class="log-entry system">Press Run or Step to begin.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMBEDDED DATA — mirrors src/shared/content/ (update when source changes)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const TUNING = {
+  combat: { attackIntervalMs: 600, critChance: 0.05, critMultiplier: 1.5, damageVariance: 0.1, healOnKillPct: 0.45 },
+  monster: {
+    baseHp: 7, hpPerDepth: 2.2, baseAttack: 2, attackPerDepth: 0.5,
+    baseXp: 4, xpPerDepth: 2, baseGold: 3, goldPerDepth: 2,
+    eliteChance: 0.05, eliteChancePerDepth: 0.001,
+    eliteHpMult: 3.5, eliteAtkMult: 1.5, eliteRewardMult: 4,
+    bossHpMult: 10, bossAtkMult: 2.5, bossRewardMult: 12,
+    passiveBudgetBase: 4, passiveBudgetPerDepth: 0.3,
+  },
+};
+
+// Stat definitions (abridged — behavioral stats only)
+const STATS = {};
+[
+  {id:'lifestealPct',pct:true,target:'lifestealPct',op:'flat',kind:'behavioral',max:40,hook:'onDealDamage',handler:'healPercent'},
+  {id:'dodgeChance',pct:true,target:'dodgeChance',op:'flat',kind:'behavioral',max:40,hook:'onTakeDamage',handler:'dodgeRoll'},
+  {id:'thornsPct',pct:true,target:'thornsPct',op:'flat',kind:'behavioral',max:50,hook:'onTakeDamage',handler:'reflectPercent'},
+  {id:'healOnKillPct',pct:true,target:'healOnKillPct',op:'flat',kind:'behavioral',max:50,hook:'onKill',handler:'healOnKill'},
+  {id:'hpRegen',pct:false,target:'hpRegen',op:'flat',kind:'behavioral',hook:'perTick',handler:'regenFlat'},
+  {id:'hpRegenPct',pct:true,target:'hpRegenPct',op:'flat',kind:'behavioral',max:10,hook:'perTick',handler:'regenPercent'},
+  {id:'goldFindPct',pct:true,target:'goldFindPct',op:'flat',kind:'behavioral',max:100,hook:'onKill',handler:'bonusGold'},
+  {id:'doubleStrikeChance',pct:true,target:'doubleStrikeChance',op:'flat',kind:'behavioral',max:25,hook:'onAttack',handler:'doubleStrike'},
+  {id:'executeThreshold',pct:true,target:'executeThreshold',op:'flat',kind:'behavioral',max:20,hook:'onAttack',handler:'executeKill'},
+  {id:'armorPierce',pct:true,target:'armorPierce',op:'flat',kind:'behavioral',max:40,hook:'onAttack',handler:'ignoreDefense'},
+  {id:'counterAttackPct',pct:true,target:'counterAttackPct',op:'flat',kind:'behavioral',max:40,hook:'onTakeDamage',handler:'counterAttack'},
+  {id:'reviveChance',pct:true,target:'reviveChance',op:'flat',kind:'behavioral',max:10,hook:'onTakeDamage',handler:'reviveRoll'},
+  {id:'critHeal',pct:true,target:'critHeal',op:'flat',kind:'behavioral',max:20,hook:'onCrit',handler:'critHealEffect'},
+  {id:'explodeOnKill',pct:true,target:'explodeOnKill',op:'flat',kind:'behavioral',max:40,hook:'onKill',handler:'explodeAoE'},
+  {id:'blockChance',pct:true,target:'blockChance',op:'flat',kind:'behavioral',max:35,hook:'onTakeDamage',handler:'blockRoll'},
+].forEach(s => { STATS[s.id] = s; });
+
+// Monster templates
+const TEMPLATES = [
+  {id:'goblin_scout',name:'Goblin Scout',kind:'grunt',baseStats:{hp:8,atk:4,def:0},statMult:1.0,passivePool:'goblinoid',depthMin:1,depthMax:9},
+  {id:'goblin_brute',name:'Goblin Brute',kind:'brute',baseStats:{hp:20,atk:6,def:2},statMult:1.3,passivePool:'brute',depthMin:1,depthMax:9},
+  {id:'goblin_chief',name:'Goblin Chieftain',kind:'brute',baseStats:{hp:40,atk:8,def:3},statMult:1.5,passivePool:'goblinoid',depthMin:1,depthMax:9,bossInterval:5},
+  {id:'skeleton',name:'Skeleton',kind:'grunt',baseStats:{hp:12,atk:5,def:1},statMult:1.1,passivePool:'undead',depthMin:10,depthMax:19},
+  {id:'skeleton_capt',name:'Skeleton Captain',kind:'brute',baseStats:{hp:25,atk:7,def:3},statMult:1.4,passivePool:'undead',depthMin:10,depthMax:19},
+  {id:'necromancer',name:'Necromancer',kind:'caster',baseStats:{hp:50,atk:10,def:4},statMult:1.6,passivePool:'undead',depthMin:10,depthMax:19,bossInterval:10},
+  {id:'giant_rat',name:'Giant Rat',kind:'swarm',baseStats:{hp:6,atk:3,def:0},statMult:1.3,passivePool:'swarm',depthMin:20,depthMax:29},
+  {id:'broodmother',name:'Broodmother',kind:'swarm',baseStats:{hp:60,atk:12,def:5},statMult:1.7,passivePool:'swarm',depthMin:20,depthMax:29,bossInterval:10},
+  {id:'wraith',name:'Wraith',kind:'caster',baseStats:{hp:16,atk:7,def:2},statMult:1.2,passivePool:'undead',depthMin:30},
+];
+
+// Passive pools
+const PASSIVE_POOLS = {
+  goblinoid: {tier1:['hpRegen'],tier2:['doubleStrikeChance','counterAttackPct'],tier3:['explodeOnKill']},
+  undead:    {tier1:['hpRegen','thornsPct'],tier2:['blockChance','lifestealPct'],tier3:['reviveChance']},
+  swarm:     {tier1:['hpRegen','dodgeChance'],tier2:['lifestealPct'],tier3:['executeThreshold','explodeOnKill']},
+  brute:     {tier1:['thornsPct'],tier2:['blockChance','counterAttackPct'],tier3:['doubleStrikeChance']},
+};
+
+const RARITY_RULES = {
+  normal: {tiers:0,count:[0,0]},
+  elite:  {tiers:2,count:[1,2]},
+  boss:   {tiers:3,count:[2,3]},
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMBAT ENGINE — mirrors src/client/game/LaneScene + shared handlers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function rng() { return Math.random(); }
+
+function pickN(arr, n) {
+  const copy = [...arr], out = [], count = Math.min(n, copy.length);
+  for (let i = 0; i < count; i++) out.push(copy.splice(Math.floor(rng() * copy.length), 1)[0]);
+  return out;
+}
+
+function rollDamage(atk, defPct, critChancePct, critMult) {
+  let dmg = atk * (1 - defPct / 100);
+  dmg *= 1 - TUNING.combat.damageVariance + rng() * 2 * TUNING.combat.damageVariance;
+  const crit = rng() < critChancePct / 100;
+  if (crit) dmg *= (critMult || TUNING.combat.critMultiplier);
+  return { dmg: Math.max(1, Math.round(dmg)), crit };
+}
+
+function monsterPassiveValue(statId, budget) {
+  const def = STATS[statId];
+  if (!def) return 1;
+  if (def.pct) {
+    const lo = Math.max(3, Math.round(budget * 1.2));
+    const hi = Math.max(lo + 5, Math.round(budget * 2.5));
+    const v = Math.max(1, Math.round(lo + rng() * (hi - lo)));
+    return def.max ? Math.min(v, def.max) : v;
+  }
+  return Math.max(1, Math.round(budget * 0.6)); // flat: budget × ~0.6
+}
+
+function rollPassives(poolId, rarity, budget) {
+  const pool = PASSIVE_POOLS[poolId];
+  const rule = RARITY_RULES[rarity];
+  if (!pool || !rule || rule.tiers === 0) return {};
+  const tiers = ['tier1','tier2','tier3'];
+  const candidates = [];
+  for (let i = 0; i < rule.tiers; i++) candidates.push(...(pool[tiers[i]] || []));
+  const [lo, hi] = rule.count;
+  const n = Math.min(lo + Math.floor(rng() * (hi - lo + 1)), candidates.length);
+  if (n <= 0) return {};
+  const out = {};
+  for (const s of pickN(candidates, n)) out[s] = monsterPassiveValue(s, budget);
+  return out;
+}
+
+function behavioralStats(d) {
+  const g = {onCombatStart:[],onAttack:[],onCrit:[],onDealDamage:[],onTakeDamage:[],onKill:[],perTick:[]};
+  for (const [id, def] of Object.entries(STATS)) {
+    if (def.kind !== 'behavioral' || !def.hook || !def.handler) continue;
+    const v = d[def.target] || d[id] || 0;
+    if (v > 0) g[def.hook].push({stat:id, val:v});
+  }
+  return g;
+}
+
+// Handler functions (ported from handlers.ts)
+const HANDLERS = {
+  healPercent(dmg, val, hero) { if (val<=0||dmg<=0) return {}; return {heal:Math.round(dmg*val/100)}; },
+  dodgeRoll(dmg, val) { if (val<=0) return {}; return rng()*100<val?{dodged:true}:{}; },
+  reflectPercent(dmg, val) { if (val<=0||dmg<=0) return {}; return {reflect:Math.round(dmg*val/100)}; },
+  healOnKill(dmg, val, hero) { if (val<=0) return {}; return {heal:Math.round(hero.maxHp*val/100)}; },
+  regenFlat(dmg, val) { if (val<=0) return {}; return {regen:val}; },
+  regenPercent(dmg, val, hero) { if (val<=0) return {}; return {regen:Math.round(hero.maxHp*val/100)}; },
+  bonusGold(dmg, val) { if (val<=0) return {}; return {bonusGold:val}; },
+  doubleStrike(dmg, val) { if (val<=0) return {}; return rng()*100<val?{extraDmg:-1}:{}; },
+  executeKill(dmg, val, hero, monster) { if (val<=0||monster.hp<=0) return {}; return (monster.hp/monster.maxHp*100<=val)?{dead:true}:{}; },
+  ignoreDefense(dmg, val, hero) { if (val<=0) return {}; return {extraDmg:Math.round(hero.attack*val/100)}; },
+  counterAttack(dmg, val, hero) { if (val<=0) return {}; return {counterDmg:Math.round(hero.attack*val/100)}; },
+  reviveRoll(dmg, val, hero) { if (val<=0) return {}; return rng()*100<val?{heal:Math.round(hero.maxHp*val/100)}:{}; },
+  critHealEffect(dmg, val, hero) { if (val<=0) return {}; return {heal:Math.round(hero.maxHp*val/100)}; },
+  explodeAoE(dmg, val, hero, monster) { if (val<=0) return {}; return {extraDmg:Math.round(monster.maxHp*val/100)}; },
+  blockRoll(dmg, val) { if (val<=0||dmg<=0) return {}; return rng()*100<val?{blocked:true}:{}; },
+};
+
+function dispatchHook(hook, groups, dmg, actor, target) {
+  const out = {};
+  for (const {stat, val} of (groups[hook] || [])) {
+    const fn = HANDLERS[STATS[stat]?.handler];
+    if (!fn) continue;
+    const r = fn(dmg, val, actor, target);
+    if (r.heal) actor.hp = Math.min(actor.maxHp, actor.hp + r.heal);
+    if (r.reflect) out.reflect = (out.reflect||0) + r.reflect;
+    if (r.extraDmg) out.extraDmg = (out.extraDmg||0) + r.extraDmg;
+    if (r.dodged) out.dodged = true;
+    if (r.blocked) out.blocked = true;
+    if (r.dead) out.dead = true;
+    if (r.counterDmg) out.counterDmg = (out.counterDmg||0) + r.counterDmg;
+    if (r.regen) out.regen = (out.regen||0) + r.regen;
+    if (r.bonusGold) out.bonusGold = (out.bonusGold||0) + r.bonusGold;
+  }
+  return out;
+}
+
+function spawnMonster(depth) {
+  const d = Math.max(1, Math.floor(depth));
+  const m = TUNING.monster;
+
+  // Boss check
+  const boss = TEMPLATES.filter(t => t.bossInterval && d >= t.depthMin && (!t.depthMax || d <= t.depthMax) && d % t.bossInterval === 0).pop();
+  if (boss) {
+    const budget = m.passiveBudgetBase + m.passiveBudgetPerDepth * d;
+    const passives = rollPassives(boss.passivePool, 'boss', budget);
+    return {
+      name: boss.name, kind: boss.kind, rarity: 'boss', templateId: boss.id,
+      hp: Math.round((m.baseHp + m.hpPerDepth * d) * boss.statMult * m.bossHpMult),
+      attack: Math.round((m.baseAttack + m.attackPerDepth * d) * boss.statMult * m.bossAtkMult),
+      defense: Math.round(boss.baseStats.def * boss.statMult),
+      passives,
+    };
+  }
+
+  const active = TEMPLATES.filter(t => !t.bossInterval && d >= t.depthMin && (!t.depthMax || d <= t.depthMax));
+  if (!active.length) {
+    const t = TEMPLATES[TEMPLATES.length-1];
+    return { name: t.name, kind: t.kind, rarity: 'normal', templateId: t.id,
+      hp: Math.round((m.baseHp+m.hpPerDepth*d)*t.statMult), attack: Math.round((m.baseAttack+m.attackPerDepth*d)*t.statMult),
+      defense: Math.round(t.baseStats.def*t.statMult), passives: {} };
+  }
+  const tpl = active[Math.floor(rng() * active.length)];
+  const isElite = rng() < Math.min(m.eliteChance + m.eliteChancePerDepth * d, 0.4);
+  const rarity = isElite ? 'elite' : 'normal';
+  const hpMult = isElite ? m.eliteHpMult : 1;
+  const atkMult = isElite ? m.eliteAtkMult : 1;
+  const budget = isElite ? m.passiveBudgetBase + m.passiveBudgetPerDepth * d : 0;
+  const passives = rollPassives(tpl.passivePool, rarity, budget);
+  return {
+    name: isElite ? `Elite ${tpl.name}` : tpl.name, kind: tpl.kind, rarity, templateId: tpl.id,
+    hp: Math.round((m.baseHp + m.hpPerDepth * d) * tpl.statMult * hpMult),
+    attack: Math.round((m.baseAttack + m.attackPerDepth * d) * tpl.statMult * atkMult),
+    defense: Math.round(tpl.baseStats.def * tpl.statMult), passives,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SIM STATE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let hero, monster, heroBeh, monBeh, wave, tick, over, monRevived, tickAccum;
+let heroDmgDealt, monDmgDealt, heroProcs, monProcs, logEntries, running, runTimer;
+
+function makeCombatant(hp, atk, def, crit, ls, dodge, regen) {
+  return { hp, maxHp: hp, attack: atk, defense: def, critChance: crit, critMultiplier: 1.5, lifesteal: ls, dodge, hpRegen: regen, goldFind: 0 };
+}
+
+function reset() {
+  const depth = +document.getElementById('depth').value || 5;
+  wave = spawnMonster(depth);
+  hero = makeCombatant(
+    +document.getElementById('hero-hp').value || 100,
+    +document.getElementById('hero-atk').value || 14,
+    +document.getElementById('hero-def').value || 12,
+    +document.getElementById('hero-crit').value || 5,
+    +document.getElementById('hero-ls').value || 0,
+    +document.getElementById('hero-dodge').value || 0,
+    +document.getElementById('hero-regen').value || 0,
+  );
+  monster = { hp: wave.hp, maxHp: wave.hp, attack: wave.attack, defense: wave.defense,
+    critChance: 5, critMultiplier: 1.5, lifesteal: 0, dodge: 0, hpRegen: 0, goldFind: 0 };
+  heroBeh = behavioralStats({lifestealPct:hero.lifesteal,dodgeChance:hero.dodge,thornsPct:0,hpRegen:hero.hpRegen,healOnKillPct:45,goldFindPct:hero.goldFind});
+  monBeh = behavioralStats(wave.passives);
+  tick = 0; over = false; monRevived = false; tickAccum = 0;
+  heroDmgDealt = 0; monDmgDealt = 0; heroProcs = {}; monProcs = {};
+  logEntries = [];
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('result-area').innerHTML = '';
+  document.getElementById('tick-counter').textContent = 'Tick 0';
+  renderMonsterCard();
+  renderBars();
+  if (running) { clearTimeout(runTimer); running = false; }
+  log('system', 'Ready — '+wave.name+' ('+wave.rarity+') spawned. Press Run or Step.');
+}
+
+function log(side, msg) {
+  logEntries.push({side, msg, tick: tick+1});
+  const div = document.createElement('div');
+  div.className = 'log-entry ' + (side === 'hero' ? 'hero' : side === 'monster' ? 'monster' : side === 'crit' ? 'crit' : side === 'proc' ? 'proc' : 'system');
+  div.textContent = `[${String(tick+1).padStart(3)}] ${msg}`;
+  const logEl = document.getElementById('log');
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function incProc(side, name) {
+  const m = side === 'hero' ? heroProcs : monProcs;
+  m[name] = (m[name] || 0) + 1;
+}
+
+function renderBars() {
+  const hPct = Math.max(0, Math.round(hero.hp / hero.maxHp * 100));
+  const mPct = Math.max(0, Math.round(monster.hp / monster.maxHp * 100));
+  document.getElementById('hero-bar').style.width = hPct + '%';
+  document.getElementById('hero-bar-text').textContent = Math.max(0,hero.hp) + ' / ' + hero.maxHp;
+  document.getElementById('mon-bar').style.width = mPct + '%';
+  document.getElementById('mon-bar-text').textContent = Math.max(0,monster.hp) + ' / ' + monster.maxHp;
+}
+
+function renderMonsterCard() {
+  const el = document.getElementById('mon-name');
+  el.textContent = wave.name;
+  el.className = 'name ' + (wave.rarity === 'boss' ? 'boss' : wave.rarity === 'elite' ? 'elite' : '');
+  document.getElementById('mon-meta').textContent = wave.rarity.toUpperCase() + ' · ' + wave.kind + ' · ' + wave.templateId + ' · HP ' + wave.hp + ' · ATK ' + wave.attack + ' · DEF ' + wave.defense;
+  const pEl = document.getElementById('mon-passives');
+  const plist = Object.entries(wave.passives);
+  if (plist.length) {
+    pEl.innerHTML = plist.map(([s,v]) => {
+      const def = STATS[s];
+      return '<span class="passive-tag">'+(def?def.id:s)+': '+(def&&def.pct?v+'%':v)+'</span>';
+    }).join('');
+  } else {
+    pEl.innerHTML = '<span style="font-size:13px;color:#666">No passives (normal enemy)</span>';
+  }
+}
+
+function doTick() {
+  if (over) return;
+  tickAccum++;
+  const tickMs = TUNING.combat.attackIntervalMs;
+  if (tickAccum >= Math.round(1000 / tickMs)) {
+    tickAccum = 0;
+    // perTick both sides
+    const ht = dispatchHook('perTick', heroBeh, 0, hero, monster);
+    if (ht.regen && hero.hp > 0 && hero.hp < hero.maxHp) hero.hp = Math.min(hero.maxHp, hero.hp + ht.regen);
+    const mt = dispatchHook('perTick', monBeh, 0, monster, hero);
+    if (mt.regen && monster.hp > 0 && monster.hp < monster.maxHp) monster.hp = Math.min(monster.maxHp, monster.hp + mt.regen);
+  }
+
+  // ── Hero attacks ──
+  if (monster.hp > 0) {
+    const onAtk = dispatchHook('onAttack', heroBeh, 0, hero, monster);
+    if (onAtk.dead) { monster.hp = 0; log('crit','⚡ EXECUTE — instant kill!'); incProc('hero','execute'); }
+    else {
+      const effAtk = hero.attack + (onAtk.extraDmg > 0 ? onAtk.extraDmg : 0);
+      if (onAtk.extraDmg > 0) { log('proc','Armor Pierce: +'+onAtk.extraDmg+' bonus'); incProc('hero','armorPierce'); }
+      const hit = rollDamage(effAtk, monster.defense, hero.critChance, hero.critMultiplier);
+      const monDef = dispatchHook('onTakeDamage', monBeh, hit.dmg, monster, hero);
+      if (monDef.dodged) {
+        log('monster','🛡️ DODGE — evaded '+hit.dmg+' dmg'); incProc('monster','dodge');
+        if (monDef.counterDmg) { hero.hp -= monDef.counterDmg; log('monster','↩️ Counter: '+monDef.counterDmg+' → hero'); incProc('monster','counterAttack'); }
+      } else if (monDef.blocked) {
+        log('monster','🛡️ BLOCK — negated '+hit.dmg+' dmg'); incProc('monster','block');
+      } else {
+        monster.hp -= hit.dmg; heroDmgDealt += hit.dmg;
+        log('hero','⚔️ '+hit.dmg+(hit.crit?' 💥CRIT!':'')+' → monster ('+Math.max(0,monster.hp)+'/'+monster.maxHp+')');
+        if (hit.crit) incProc('hero','crit');
+        if (monDef.reflect) { hero.hp -= monDef.reflect; log('monster','🌿 Thorns: '+monDef.reflect+' reflect → hero'); incProc('monster','thorns'); }
+        if (hit.crit) {
+          const oc = dispatchHook('onCrit', heroBeh, hit.dmg, hero, monster);
+          if (oc.heal) { hero.hp = Math.min(hero.maxHp, hero.hp+oc.heal); log('hero','💚 Crit Heal: +'+oc.heal); incProc('hero','critHeal'); }
+        }
+        const od = dispatchHook('onDealDamage', heroBeh, hit.dmg, hero, monster);
+        if (od.heal) { hero.hp = Math.min(hero.maxHp, hero.hp+od.heal); log('hero','🩸 Lifesteal: +'+od.heal); incProc('hero','lifesteal'); }
+      }
+      if (onAtk.extraDmg === -1 && monster.hp > 0) {
+        const h2 = rollDamage(effAtk, monster.defense, hero.critChance, hero.critMultiplier);
+        const md2 = dispatchHook('onTakeDamage', monBeh, h2.dmg, monster, hero);
+        if (!md2.dodged && !md2.blocked) { monster.hp -= h2.dmg; heroDmgDealt += h2.dmg; log('hero','⚡ Double Strike: '+h2.dmg+' → monster ('+Math.max(0,monster.hp)+'/'+monster.maxHp+')'); incProc('hero','doubleStrike'); }
+      }
+    }
+  }
+
+  // Monster death
+  if (monster.hp <= 0) {
+    const mok = dispatchHook('onKill', monBeh, wave.hp, monster, hero);
+    if (mok.extraDmg) { hero.hp -= mok.extraDmg; log('monster','💥 EXPLODE: '+mok.extraDmg+' → hero'); incProc('monster','explode'); }
+    if (!monRevived) {
+      const md = dispatchHook('onTakeDamage', monBeh, 1, monster, hero);
+      if (md.heal) { monster.hp = Math.min(monster.maxHp, md.heal); monRevived = true; log('monster','💀 REVIVED! Back to '+monster.hp+'/'+monster.maxHp); incProc('monster','revive'); renderBars(); return; }
+    }
+    const ok = dispatchHook('onKill', heroBeh, wave.hp, hero, monster);
+    if (ok.heal) { hero.hp = Math.min(hero.maxHp, hero.hp+ok.heal); log('hero','💚 Heal on Kill: +'+ok.heal); incProc('hero','healOnKill'); }
+    over = true;
+    showResult('hero');
+    return;
+  }
+
+  // ── Monster attacks ──
+  if (hero.hp > 0) {
+    const ma = dispatchHook('onAttack', monBeh, 0, monster, hero);
+    if (ma.dead) { hero.hp = 0; log('monster','⚡ EXECUTE — hero slain!'); incProc('monster','execute'); }
+    else {
+      const mea = monster.attack + (ma.extraDmg > 0 ? ma.extraDmg : 0);
+      if (ma.extraDmg > 0) { log('proc','Armor Pierce: +'+ma.extraDmg); incProc('monster','armorPierce'); }
+      const mh = rollDamage(mea, hero.defense, monster.critChance, monster.critMultiplier);
+      const hd = dispatchHook('onTakeDamage', heroBeh, mh.dmg, hero, monster);
+      if (hd.dodged) {
+        log('hero','🛡️ DODGE — evaded '+mh.dmg+' dmg'); incProc('hero','dodge');
+        if (hd.counterDmg) { monster.hp -= hd.counterDmg; log('hero','↩️ Counter: '+hd.counterDmg+' → monster'); incProc('hero','counterAttack'); }
+      } else if (hd.blocked) {
+        log('hero','🛡️ BLOCK — negated '+mh.dmg+' dmg'); incProc('hero','block');
+      } else {
+        hero.hp -= mh.dmg; monDmgDealt += mh.dmg;
+        log('monster','⚔️ '+mh.dmg+(mh.crit?' 💥CRIT!':'')+' → hero ('+Math.max(0,hero.hp)+'/'+hero.maxHp+')');
+        if (mh.crit) incProc('monster','crit');
+        if (hd.reflect) { monster.hp -= hd.reflect; log('hero','🌿 Thorns: '+hd.reflect+' reflect → monster'); incProc('hero','thorns'); }
+        if (mh.crit) {
+          const mc = dispatchHook('onCrit', monBeh, mh.dmg, monster, hero);
+          if (mc.heal) { monster.hp = Math.min(monster.maxHp, monster.hp+mc.heal); log('monster','💚 Crit Heal: +'+mc.heal); incProc('monster','critHeal'); }
+        }
+        const md = dispatchHook('onDealDamage', monBeh, mh.dmg, monster, hero);
+        if (md.heal) { monster.hp = Math.min(monster.maxHp, monster.hp+md.heal); log('monster','🩸 Lifesteal: +'+md.heal); incProc('monster','lifesteal'); }
+      }
+      if (ma.extraDmg === -1 && hero.hp > 0) {
+        const mh2 = rollDamage(mea, hero.defense, monster.critChance, monster.critMultiplier);
+        const hd2 = dispatchHook('onTakeDamage', heroBeh, mh2.dmg, hero, monster);
+        if (!hd2.dodged && !hd2.blocked) { hero.hp -= mh2.dmg; monDmgDealt += mh2.dmg; log('monster','⚡ Double Strike: '+mh2.dmg+' → hero ('+Math.max(0,hero.hp)+'/'+hero.maxHp+')'); incProc('monster','doubleStrike'); }
+      }
+    }
+  }
+
+  // Hero death
+  if (hero.hp <= 0) {
+    const hl = dispatchHook('onTakeDamage', heroBeh, 1, hero, monster);
+    if (hl.heal) { hero.hp = Math.min(hero.maxHp, hero.hp+hl.heal); log('hero','💀 REVIVED! Back to '+hero.hp+'/'+hero.maxHp); incProc('hero','revive'); renderBars(); return; }
+    over = true;
+    showResult('monster');
+    return;
+  }
+
+  renderBars();
+}
+
+function showResult(winner) {
+  renderBars();
+  document.getElementById('tick-counter').textContent = 'Tick ' + (tick+1);
+  const area = document.getElementById('result-area');
+  const cls = winner === 'hero' ? 'hero' : 'monster';
+  const label = winner === 'hero' ? '🟢 HERO WINS' : '🔴 MONSTER WINS';
+  area.innerHTML = '<div class="result-banner '+cls+'">'+label+' — '+(tick+1)+' ticks · Hero dealt '+heroDmgDealt+' dmg · Monster dealt '+monDmgDealt+' dmg</div>';
+  if (Object.keys(heroProcs).length) {
+    area.innerHTML += '<div class="proc-summary">🟢 Hero procs: '+Object.entries(heroProcs).map(([k,v])=>k+' ×'+v).join(' · ')+'</div>';
+  }
+  if (Object.keys(monProcs).length) {
+    area.innerHTML += '<div class="proc-summary">🔴 Monster procs: '+Object.entries(monProcs).map(([k,v])=>k+' ×'+v).join(' · ')+'</div>';
+  }
+}
+
+function step() {
+  if (over) return;
+  tick++;
+  document.getElementById('tick-counter').textContent = 'Tick ' + tick;
+  doTick();
+}
+
+function run() {
+  if (over) { reset(); }
+  const speed = +document.getElementById('speed').value;
+  if (speed === 0) {
+    while (!over) { tick++; doTick(); }
+    renderBars();
+  } else {
+    running = true;
+    function loop() {
+      if (over || !running) return;
+      tick++; doTick();
+      document.getElementById('tick-counter').textContent = 'Tick ' + tick;
+      runTimer = setTimeout(loop, speed);
+    }
+    loop();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI WIRING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+document.getElementById('btn-step').addEventListener('click', () => { if (running) { clearTimeout(runTimer); running = false; } if (over) reset(); step(); });
+document.getElementById('btn-run').addEventListener('click', () => { if (running) { clearTimeout(runTimer); running = false; return; } run(); });
+document.getElementById('btn-reset').addEventListener('click', () => { if (running) { clearTimeout(runTimer); running = false; } reset(); });
+document.querySelectorAll('.preset').forEach(el => {
+  el.addEventListener('click', () => {
+    for (const [k,v] of Object.entries(el.dataset)) document.getElementById('hero-'+k).value = v;
+    reset();
+  });
+});
+document.querySelectorAll('input').forEach(el => el.addEventListener('change', reset));
+document.getElementById('depth').addEventListener('change', reset);
+
+reset();
+</script>
+</body>
+</html>
