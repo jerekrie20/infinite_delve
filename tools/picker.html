@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UI Atlas Picker — Infinite Delve</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #17111f;
+        color: #ece7f5;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 18px;
+        align-items: center;
+        padding: 12px 16px;
+        background: #1c1430;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      header h1 { font-size: 15px; margin: 0; letter-spacing: 0.5px; }
+      label { font-size: 13px; color: #cbc3dd; display: flex; align-items: center; gap: 6px; }
+      input[type='search'] {
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: #120c1c;
+        color: #fff;
+        width: 160px;
+      }
+      #count { font-size: 13px; color: #9d8fc0; }
+      #stage-wrap { padding: 20px; overflow: auto; }
+      #stage {
+        position: relative;
+        display: inline-block;
+        background: #0c0812;
+        outline: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      #sheet { display: block; image-rendering: pixelated; }
+      #sheet.checker {
+        background-image: linear-gradient(45deg, #221a30 25%, transparent 25%),
+          linear-gradient(-45deg, #221a30 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #221a30 75%),
+          linear-gradient(-45deg, transparent 75%, #221a30 75%);
+        background-size: 16px 16px;
+        background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      }
+      .frame {
+        position: absolute;
+        border: 1px solid rgba(90, 208, 122, 0.35);
+        cursor: pointer;
+      }
+      .frame:hover { border-color: #ffe066; background: rgba(255, 224, 102, 0.18); z-index: 2; }
+      .frame.sel { border-color: #4aa3ff; background: rgba(74, 163, 255, 0.25); z-index: 3; }
+      #hint {
+        position: fixed;
+        pointer-events: none;
+        z-index: 10;
+        padding: 4px 8px;
+        font-size: 12px;
+        background: #000;
+        border: 1px solid #444;
+        border-radius: 6px;
+        white-space: nowrap;
+        display: none;
+      }
+      #readout {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        z-index: 8;
+        width: 340px;
+        max-width: calc(100vw - 32px);
+        padding: 14px 16px;
+        background: #1c1430;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 12px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+        display: none;
+      }
+      #readout h2 { margin: 0 0 8px; font-size: 15px; color: #ffe066; }
+      #readout code {
+        display: block;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin: 8px 0;
+        padding: 8px 10px;
+        font-size: 12px;
+        background: #120c1c;
+        border-radius: 8px;
+        color: #b9f0c8;
+      }
+      #readout .row { font-size: 13px; color: #cbc3dd; margin: 2px 0; }
+      #err { padding: 20px; color: #ff8a8a; }
+      button {
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        cursor: pointer;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>🗂️ UI Atlas Picker</h1>
+      <label>Zoom
+        <select id="zoom">
+          <option value="1">1×</option>
+          <option value="2" selected>2×</option>
+          <option value="3">3×</option>
+          <option value="4">4×</option>
+        </select>
+      </label>
+      <label>Hide slivers ≤
+        <input id="minsize" type="range" min="1" max="40" value="17" />
+        <span id="minsize-val">17</span>px
+      </label>
+      <label><input id="checker" type="checkbox" /> checker bg</label>
+      <label><input id="show-boxes" type="checkbox" checked /> show boxes</label>
+      <input id="search" type="search" placeholder="frame name…" />
+      <span id="count"></span>
+    </header>
+
+    <div id="stage-wrap">
+      <div id="stage">
+        <img id="sheet" alt="ui sheet" />
+      </div>
+    </div>
+    <div id="err"></div>
+
+    <div id="hint"></div>
+    <div id="readout">
+      <h2 id="r-name">—</h2>
+      <div class="row" id="r-coords"></div>
+      <code id="r-snippet"></code>
+      <button id="r-copy">Copy frame name</button>
+    </div>
+
+    <script type="module">
+      const SHEET = '/ui-sheet.png';
+      const ATLAS = '/ui-sheet.json';
+
+      const stage = document.getElementById('stage');
+      const sheet = document.getElementById('sheet');
+      const hint = document.getElementById('hint');
+      const readout = document.getElementById('readout');
+      const $ = (id) => document.getElementById(id);
+
+      let frames = [];
+      let zoom = 2;
+      let minSize = 17;
+      let selected = null;
+
+      async function boot() {
+        try {
+          const atlas = await (await fetch(ATLAS)).json();
+          frames = atlas.frames.map((f) => ({ name: f.filename, ...f.frame })); // {name,x,y,w,h}
+        } catch (e) {
+          $('err').textContent = 'Could not load ' + ATLAS + ' — ' + e;
+          return;
+        }
+        sheet.src = SHEET;
+        sheet.onerror = () => {
+          $('err').innerHTML =
+            'Sheet image not found at <b>' + SHEET +
+            '</b>. Drop the PNG at <b>src/client/public/ui-sheet.png</b> and reload.';
+        };
+        sheet.onload = render;
+        // render boxes even if the image 404s (uses natural sheet size 1024)
+        setTimeout(() => { if (!sheet.naturalWidth) render(); }, 400);
+        wire();
+      }
+
+      function render() {
+        [...stage.querySelectorAll('.frame')].forEach((n) => n.remove());
+        const w = (sheet.naturalWidth || 1024) * zoom;
+        const h = (sheet.naturalHeight || 1024) * zoom;
+        sheet.style.width = w + 'px';
+        sheet.style.height = h + 'px';
+        stage.style.width = w + 'px';
+        stage.style.height = h + 'px';
+
+        const q = $('search').value.trim().toLowerCase();
+        const showBoxes = $('show-boxes').checked;
+        let shown = 0;
+        if (showBoxes) {
+          for (const f of frames) {
+            const big = f.w > minSize || f.h > minSize;
+            const match = !q || f.name.toLowerCase().includes(q);
+            if (!big || !match) continue;
+            shown++;
+            const d = document.createElement('div');
+            d.className = 'frame' + (selected === f.name ? ' sel' : '');
+            d.style.left = f.x * zoom + 'px';
+            d.style.top = f.y * zoom + 'px';
+            d.style.width = f.w * zoom + 'px';
+            d.style.height = f.h * zoom + 'px';
+            d.addEventListener('mousemove', (e) => showHint(e, f));
+            d.addEventListener('mouseleave', () => (hint.style.display = 'none'));
+            d.addEventListener('click', () => select(f));
+            stage.appendChild(d);
+          }
+        }
+        $('count').textContent =
+          shown + ' / ' + frames.length + ' frames shown (filtered ≤' + minSize + 'px)';
+      }
+
+      function showHint(e, f) {
+        hint.style.display = 'block';
+        hint.style.left = e.clientX + 12 + 'px';
+        hint.style.top = e.clientY + 12 + 'px';
+        hint.textContent = `${f.name}  ·  ${f.w}×${f.h}  @ (${f.x}, ${f.y})`;
+      }
+
+      function select(f) {
+        selected = f.name;
+        render();
+        readout.style.display = 'block';
+        $('r-name').textContent = f.name;
+        $('r-coords').textContent = `x:${f.x}  y:${f.y}  w:${f.w}  h:${f.h}`;
+        $('r-snippet').textContent =
+          `// image\nthis.add.image(x, y, 'ui', '${f.name}');\n\n` +
+          `// stretchy panel (tweak the 4 slice insets)\n` +
+          `this.add.nineslice(x, y, 'ui', '${f.name}', w, h, 8, 8, 8, 8);`;
+      }
+
+      function wire() {
+        $('zoom').addEventListener('change', (e) => { zoom = +e.target.value; render(); });
+        $('minsize').addEventListener('input', (e) => {
+          minSize = +e.target.value; $('minsize-val').textContent = minSize; render();
+        });
+        $('checker').addEventListener('change', (e) => sheet.classList.toggle('checker', e.target.checked));
+        $('show-boxes').addEventListener('change', render);
+        $('search').addEventListener('input', render);
+        $('r-copy').addEventListener('click', () => {
+          if (selected) navigator.clipboard?.writeText(selected);
+          $('r-copy').textContent = 'Copied ✓';
+          setTimeout(() => ($('r-copy').textContent = 'Copy frame name'), 1000);
+        });
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "game-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--config", "vite.preview.mjs"],
+      "port": 5178
+    }
+  ]
+}

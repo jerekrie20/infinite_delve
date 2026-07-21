@@ -3,6 +3,7 @@
 // server and the Phaser client speak the same contract.
 
 import type { IdleGains } from './waves';
+import type { StatId } from './content/stats';
 
 // ---- Hero & gear ----------------------------------------------------------
 
@@ -21,19 +22,23 @@ export type GearSlot =
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
-/** Flat stat bonuses a piece of gear grants while equipped. */
-export interface GearStats {
-  attack?: number;
-  maxHp?: number;
-  /** Percent damage reduction, 0..100. */
-  defensePct?: number;
-}
+/** Stat bonuses a piece of gear grants while equipped — a sparse map over the
+ *  stat registry (only the stats this item rolled are present). */
+export type GearStats = Partial<Record<StatId, number>>;
 
 export interface GearItem {
   id: string;
   name: string;
   slot: GearSlot;
   rarity: Rarity;
+  /** Base-item id this rolled from (content/items.ts BASES) — drives name + slot. */
+  base: string;
+  /** Set id this item belongs to (content/sets.ts), if any — colors it + counts
+   *  toward set bonuses. Stamped from set membership at roll/sanitize time. */
+  set?: string;
+  /** Unique-item id (content/uniques.ts), if this is a unique — colors it gold. */
+  unique?: string;
+  /** One-to-many stat bonuses (primary + rarity-many affixes; sparse map). */
   stats: GearStats;
 }
 
@@ -51,6 +56,10 @@ export interface Hero {
   attack: number;
   /** Derived percent damage reduction, 0..100. */
   defense: number;
+  /** Derived total crit chance, whole percent (innate base + gear/set). */
+  critChance: number;
+  /** Derived total lifesteal, whole percent of damage dealt (gear/set). */
+  lifesteal: number;
   gold: number;
   /** Deepest depth ever banked (via extract). Drives the idle income rate. */
   bestDepth: number;
@@ -169,6 +178,9 @@ export interface RunResultRequest {
   outcome: RunOutcome;
   /** How many depths the hero cleared this run (1 = first monster killed). */
   depthReached: number;
+  /** Gear found this run (unbanked). Banked on extract, discarded on death.
+   *  Server sanitizes/clamps it (v0 trusts the client on drops). */
+  haul?: GearItem[];
 }
 
 export interface RunResultResponse {
@@ -180,7 +192,35 @@ export interface RunResultResponse {
     levelsGained: number;
     /** New best depth after this run (unchanged on death). */
     bestDepth: number;
+    /** Gear items added to the hero this run (extract only). */
+    itemsBanked: number;
+    /** How many of those auto-equipped (beat the current slot item). */
+    itemsEquipped: number;
   };
+}
+
+/** Manual gear management from the review panel: equip a stash item OR unequip
+ *  a slot (exactly one of the two). */
+export interface EquipRequest {
+  /** Stash item id to equip. */
+  itemId?: string;
+  /** Slot to unequip back to the stash. */
+  unequip?: GearSlot;
+}
+
+export interface EquipResponse {
+  hero: Hero;
+}
+
+/** Sell a stash item for gold. */
+export interface SellRequest {
+  itemId: string;
+}
+
+export interface SellResponse {
+  hero: Hero;
+  /** Gold received (0 if the item wasn't in the stash). */
+  goldGained: number;
 }
 
 export interface DelveStartRequest {

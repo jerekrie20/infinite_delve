@@ -1,9 +1,13 @@
 // Shared, deterministic combat/reward math for the side-view idle looter.
 // Both the client (runs the live auto-battle + shows numbers) and the server
 // (awards run results + computes offline idle gains) import THIS, so the two
-// never disagree. Pure functions only — no server/client imports.
+// never disagree. Numbers come from content/tuning + content/monsters (data),
+// never hardcoded here. Pure functions only — no server/client imports.
 
-export type MonsterKind = 'grunt' | 'swarm';
+import { TUNING } from './content/tuning';
+import { archetypeForDepth, type MonsterKind } from './content/monsters';
+
+export type { MonsterKind };
 
 /** The single monster you face at a given depth (one monster per depth = your
  *  progress marker). Stats scale with depth; every 5th depth is a tougher
@@ -17,30 +21,18 @@ export interface WaveMonster {
   gold: number;
 }
 
-export const WAVE_CONFIG = {
-  baseHp: 12,
-  hpPerDepth: 5,
-  baseAttack: 3,
-  attackPerDepth: 1,
-  baseXp: 4,
-  xpPerDepth: 2,
-  baseGold: 3,
-  goldPerDepth: 2,
-  swarmEveryN: 5,
-  swarmMultiplier: 1.5,
-} as const;
-
 export function monsterForDepth(depth: number): WaveMonster {
   const d = Math.max(1, Math.floor(depth));
-  const kind: MonsterKind = d % WAVE_CONFIG.swarmEveryN === 0 ? 'swarm' : 'grunt';
-  const mult = kind === 'swarm' ? WAVE_CONFIG.swarmMultiplier : 1;
+  const arch = archetypeForDepth(d);
+  const m = TUNING.monster;
+  const mult = arch.statMult;
   return {
-    kind,
-    hp: Math.round((WAVE_CONFIG.baseHp + WAVE_CONFIG.hpPerDepth * d) * mult),
-    attack: Math.round((WAVE_CONFIG.baseAttack + WAVE_CONFIG.attackPerDepth * d) * mult),
+    kind: arch.kind,
+    hp: Math.round((m.baseHp + m.hpPerDepth * d) * mult),
+    attack: Math.round((m.baseAttack + m.attackPerDepth * d) * mult),
     defense: 0,
-    xp: Math.round((WAVE_CONFIG.baseXp + WAVE_CONFIG.xpPerDepth * d) * mult),
-    gold: Math.round((WAVE_CONFIG.baseGold + WAVE_CONFIG.goldPerDepth * d) * mult),
+    xp: Math.round((m.baseXp + m.xpPerDepth * d) * mult),
+    gold: Math.round((m.baseGold + m.goldPerDepth * d) * mult),
   };
 }
 
@@ -61,20 +53,11 @@ export function runReward(depthReached: number): { gold: number; xp: number } {
 
 // ---- Idle / offline accrual ------------------------------------------------
 
-export const IDLE_CONFIG = {
-  /** Offline gains stop accruing after this long — the "come back tomorrow"
-   *  cap that makes the daily check-in the habit (the DQE money hook). */
-  maxIdleSeconds: 8 * 60 * 60, // 8 hours
-  /** Idle pace: the hero passively clears ~one monster this often. Slow on
-   *  purpose — idle is spending money, not the main progression. */
-  secondsPerKill: 60,
-} as const;
-
 /** Passive gold/sec, scaled to the monster at your best (banked) depth.
  *  Idle grants GOLD ONLY — leveling/XP stays an active-play reward, so a long
  *  break can't rocket the hero up levels (and active runs stay meaningful). */
 export function idleGoldPerSecond(bestDepth: number): number {
-  return monsterForDepth(bestDepth).gold / IDLE_CONFIG.secondsPerKill;
+  return monsterForDepth(bestDepth).gold / TUNING.idle.secondsPerKill;
 }
 
 export interface IdleGains {
@@ -91,12 +74,12 @@ export interface IdleGains {
 
 export function computeIdle(bestDepth: number, elapsedSeconds: number): IdleGains {
   const elapsed = Math.max(0, Math.floor(elapsedSeconds));
-  const paid = Math.min(elapsed, IDLE_CONFIG.maxIdleSeconds);
+  const paid = Math.min(elapsed, TUNING.idle.maxIdleSeconds);
   return {
     seconds: elapsed,
     paidSeconds: paid,
     gold: Math.floor(idleGoldPerSecond(bestDepth) * paid),
     xp: 0,
-    capped: elapsed >= IDLE_CONFIG.maxIdleSeconds,
+    capped: elapsed >= TUNING.idle.maxIdleSeconds,
   };
 }

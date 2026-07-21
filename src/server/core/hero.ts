@@ -7,6 +7,16 @@
 import { redis } from '@devvit/web/server';
 import type { GearItem, GearSlot, Hero, HeroClass, RunOutcome } from '../../shared/delve';
 import { computeIdle, runReward, type IdleGains } from '../../shared/waves';
+import { TUNING } from '../../shared/content/tuning';
+import { classDef } from '../../shared/content/classes';
+import { sellValue } from '../../shared/content/items';
+import {
+  bankHaul as bankHaulState,
+  deriveStats,
+  equipItem as equipItemState,
+  sellItem as sellItemState,
+  unequipSlot as unequipSlotState,
+} from '../../shared/content/gear';
 
 /** Persisted subset (Redis). Derived combat stats are recomputed on read. */
 export interface StoredHero {
@@ -29,26 +39,20 @@ export interface RunGained {
   xp: number;
   levelsGained: number;
   bestDepth: number;
+  /** How many gear items the run's haul added to the hero (extract only). */
+  itemsBanked: number;
+  /** How many of those were auto-equipped (beat the current slot item). */
+  itemsEquipped: number;
 }
-
-/** v0 hero tuning — Squire baseline (all cheap to tune in Step 4). */
-export const HERO_CONFIG = {
-  baseMaxHp: 30,
-  hpPerLevel: 8,
-  baseAttack: 6,
-  attackPerLevel: 1,
-  levelCap: 100,
-  maxDefensePct: 75,
-} as const;
 
 export const heroKey = (userId: string): string => `hero:${userId}`;
 
-/** XP needed to advance *from* the given level (rising curve, per FINALIZE #28). */
+/** XP needed to advance *from* the given level (rising curve). */
 export const xpToNext = (level: number): number =>
-  Math.round(20 * Math.pow(level, 1.5));
+  Math.round(TUNING.hero.xpCurveBase * Math.pow(level, TUNING.hero.xpCurveExp));
 
 function newStoredHero(): StoredHero {
-  const maxHp = HERO_CONFIG.baseMaxHp;
+  const maxHp = classDef('squire').baseMaxHp;
   return {
     class: 'squire',
     level: 1,
@@ -63,35 +67,15 @@ function newStoredHero(): StoredHero {
   };
 }
 
-/** Derive maxHp / attack / defense from level + equipped gear, then clamp hp. */
+/** Recompute maxHp from class + level + gear (shared derive), then clamp hp. */
 function recompute(h: StoredHero): void {
-  let maxHp = HERO_CONFIG.baseMaxHp + HERO_CONFIG.hpPerLevel * (h.level - 1);
-  for (const item of Object.values(h.equipped)) {
-    maxHp += item?.stats.maxHp ?? 0;
-  }
-  h.maxHp = maxHp;
-  if (h.hp > maxHp) h.hp = maxHp;
-}
-
-function derivedAttack(h: StoredHero): number {
-  let attack =
-    HERO_CONFIG.baseAttack + HERO_CONFIG.attackPerLevel * (h.level - 1);
-  for (const item of Object.values(h.equipped)) {
-    attack += item?.stats.attack ?? 0;
-  }
-  return attack;
-}
-
-function derivedDefense(h: StoredHero): number {
-  let def = 0;
-  for (const item of Object.values(h.equipped)) {
-    def += item?.stats.defensePct ?? 0;
-  }
-  return Math.min(def, HERO_CONFIG.maxDefensePct);
+  h.maxHp = deriveStats(h.class, h.level, h.equipped).maxHp;
+  if (h.hp > h.maxHp) h.hp = h.maxHp;
 }
 
 /** Shape a StoredHero into the client-facing Hero (adds derived stats). */
 export function toHero(h: StoredHero): Hero {
+  const d = deriveStats(h.class, h.level, h.equipped);
   return {
     class: h.class,
     level: h.level,
@@ -99,8 +83,10 @@ export function toHero(h: StoredHero): Hero {
     xpToNext: xpToNext(h.level),
     hp: h.hp,
     maxHp: h.maxHp,
-    attack: derivedAttack(h),
-    defense: derivedDefense(h),
+    attack: d.attack,
+    defense: d.defensePct,
+    critChance: d.critChance,
+    lifesteal: d.lifestealPct,
     gold: h.gold,
     bestDepth: h.bestDepth,
     stash: h.stash,
@@ -112,12 +98,12 @@ export function toHero(h: StoredHero): Hero {
 export function awardXp(h: StoredHero, xp: number): number {
   let gained = 0;
   h.xp += Math.max(0, Math.round(xp));
-  while (h.level < HERO_CONFIG.levelCap && h.xp >= xpToNext(h.level)) {
+  while (h.level < TUNING.hero.levelCap && h.xp >= xpToNext(h.level)) {
     h.xp -= xpToNext(h.level);
     h.level += 1;
     gained += 1;
   }
-  if (h.level >= HERO_CONFIG.levelCap) h.xp = 0;
+  if (h.level >= TUNING.hero.levelCap) h.xp = 0;
   recompute(h);
   h.hp = h.maxHp; // heal to full on level-up / between runs
   return gained;
@@ -135,22 +121,69 @@ export function collectIdle(h: StoredHero): IdleGains {
   return gains;
 }
 
-/** Bank the outcome of an active run. Extract → award reward for depths cleared
- *  + raise bestDepth. Death → nothing banked, bestDepth unchanged, revive. */
-export function applyRun(h: StoredHero, outcome: RunOutcome, depthReached: number): RunGained {
+/** Equip a stash item by id (shared op) + recompute. False if id not in stash. */
+export function equipItem(h: StoredHero, itemId: string): boolean {
+  const ok = equipItemState(h, itemId);
+  if (ok) recompute(h);
+  return ok;
+}
+
+/** Unequip a slot back to the stash (shared op) + recompute. False if empty. */
+export function unequipSlot(h: StoredHero, slot: GearSlot): boolean {
+  const ok = unequipSlotState(h, slot);
+  if (ok) recompute(h);
+  return ok;
+}
+
+/** Sell a stash item for gold. Returns gold gained (0 if not in stash). No stat
+ *  recompute needed — the stash doesn't affect derived stats. */
+export function sellItem(h: StoredHero, itemId: string): number {
+  const item = sellItemState(h, itemId);
+  if (!item) return 0;
+  const gold = sellValue(item);
+  h.gold += gold;
+  return gold;
+}
+
+/** Bank a run's gear haul (shared best-first auto-equip + stash) + recompute.
+ *  Returns how many were auto-equipped. */
+export function bankHaul(h: StoredHero, haul: GearItem[]): number {
+  const equippedCount = bankHaulState(h, haul);
+  recompute(h);
+  return equippedCount;
+}
+
+/** Bank the outcome of an active run. Extract → award reward for depths cleared,
+ *  bank the gear haul (auto-equip better), raise bestDepth. Death → nothing
+ *  banked (the haul is the stake), bestDepth unchanged, revive. */
+export function applyRun(
+  h: StoredHero,
+  outcome: RunOutcome,
+  depthReached: number,
+  haul: GearItem[] = []
+): RunGained {
   const depth = Math.max(0, Math.floor(depthReached));
   h.lastSeenAt = Date.now();
 
   if (outcome !== 'extracted') {
-    h.hp = h.maxHp; // hero persists; unbanked loot is the stake
-    return { gold: 0, xp: 0, levelsGained: 0, bestDepth: h.bestDepth };
+    h.hp = h.maxHp; // hero persists; the unbanked haul is the stake
+    return { gold: 0, xp: 0, levelsGained: 0, bestDepth: h.bestDepth, itemsBanked: 0, itemsEquipped: 0 };
   }
 
   const reward = runReward(depth);
   h.gold += reward.gold;
   const levelsGained = awardXp(h, reward.xp); // heals to full
+  const itemsEquipped = bankHaul(h, haul); // may raise maxHp via gear
+  h.hp = h.maxHp; // top off after gear changes
   if (depth > h.bestDepth) h.bestDepth = depth;
-  return { gold: reward.gold, xp: reward.xp, levelsGained, bestDepth: h.bestDepth };
+  return {
+    gold: reward.gold,
+    xp: reward.xp,
+    levelsGained,
+    bestDepth: h.bestDepth,
+    itemsBanked: haul.length,
+    itemsEquipped,
+  };
 }
 
 // ---- Redis I/O ------------------------------------------------------------

@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UI Map Editor — Infinite Delve</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #17111f;
+        color: #ece7f5;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: center;
+        padding: 10px 14px;
+        background: #1c1430;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      header h1 { font-size: 15px; margin: 0 8px 0 0; }
+      button {
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      button:hover { background: rgba(255, 255, 255, 0.16); }
+      button.primary { background: #37b04f; border-color: #37b04f; font-weight: bold; }
+      #status { font-size: 12px; color: #9d8fc0; margin-left: auto; }
+      #main { flex: 1; display: flex; min-height: 0; }
+
+      /* Left: sheet picker */
+      #left { flex: 1 1 auto; overflow: auto; padding: 14px; border-right: 1px solid rgba(255,255,255,0.12); }
+      #toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 12px; position: sticky; top: 0; z-index: 4; background: #17111f; padding-bottom: 8px; }
+      #toolbar label { font-size: 12px; color: #cbc3dd; display: flex; align-items: center; gap: 6px; }
+      #toolbar input[type='search'] { padding: 5px 9px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.2); background: #120c1c; color: #fff; width: 130px; }
+      #armed-note { font-size: 13px; font-weight: bold; color: #ffe066; }
+      #stage { position: relative; display: inline-block; background: #0c0812; outline: 1px solid rgba(255,255,255,0.1); }
+      #sheet { display: block; image-rendering: pixelated; }
+      .frame { position: absolute; border: 1px solid rgba(90,208,122,0.30); cursor: pointer; }
+      .frame:hover { border-color: #ffe066; background: rgba(255,224,102,0.18); z-index: 2; }
+      .frame.sel { border-color: #4aa3ff; background: rgba(74,163,255,0.28); z-index: 3; }
+
+      /* Right: roles */
+      #right { flex: 0 0 420px; overflow: auto; padding: 12px 14px; }
+      .cat { margin: 14px 0 6px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #9d8fc0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; }
+      .role { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 10px; border: 1px solid transparent; margin-bottom: 6px; background: rgba(255,255,255,0.03); }
+      .role.armed { border-color: #ffe066; background: rgba(255,224,102,0.08); }
+      .thumb { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 8px; background:
+          linear-gradient(45deg,#2a2334 25%,transparent 25%), linear-gradient(-45deg,#2a2334 25%,transparent 25%),
+          linear-gradient(45deg,transparent 75%,#2a2334 75%), linear-gradient(-45deg,transparent 75%,#2a2334 75%);
+        background-size: 12px 12px; background-position: 0 0,0 6px,6px -6px,-6px 0; border: 1px solid rgba(255,255,255,0.12); cursor: pointer; }
+      .thumb canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+      .role-body { flex: 1 1 auto; min-width: 0; }
+      .role-label { font-size: 14px; font-weight: bold; }
+      .role-key { font-size: 11px; color: #6f6690; }
+      .role-frame { font-size: 12px; color: #8fd0a0; margin-top: 2px; }
+      .role-frame.none { color: #b06a6a; }
+      .role-extras { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
+      .role-extras input[type='number'] { width: 44px; padding: 3px 5px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: #120c1c; color: #fff; font-size: 12px; }
+      .role-extras label { font-size: 11px; color: #9d8fc0; display: flex; align-items: center; gap: 3px; }
+      .role-actions { display: flex; gap: 6px; margin-top: 6px; }
+      .role-actions button { padding: 4px 9px; font-size: 12px; }
+      .badge { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,0.1); color: #cbc3dd; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+      /* Nine-slice preview panel */
+      #preview { margin-top: 10px; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.25); }
+      #preview h3 { margin: 0 0 8px; font-size: 12px; color: #9d8fc0; text-transform: uppercase; letter-spacing: 1px; }
+      #preview canvas { image-rendering: pixelated; background: #2a2334; border-radius: 6px; }
+      .prev-row { display: flex; gap: 12px; align-items: center; }
+      #err { padding: 12px 14px; color: #ff8a8a; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>🧩 UI Map Editor</h1>
+      <button class="primary" id="save">⬇ Download ui-map.json</button>
+      <button id="copy">Copy JSON</button>
+      <button id="addrole">+ Add role</button>
+      <button id="reset">Reset</button>
+      <span id="status"></span>
+    </header>
+    <div id="err"></div>
+    <div id="main">
+      <div id="left">
+        <div id="toolbar">
+          <label>Zoom
+            <select id="zoom"><option value="1">1×</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4×</option></select>
+          </label>
+          <label>Hide slivers ≤ <input id="minsize" type="range" min="1" max="40" value="14" /><span id="minsize-val">14</span>px</label>
+          <input id="search" type="search" placeholder="frame name…" />
+          <span id="armed-note"></span>
+        </div>
+        <div id="stage"><img id="sheet" alt="ui sheet" /></div>
+      </div>
+      <div id="right">
+        <div id="roles"></div>
+        <div id="preview">
+          <h3>Nine-slice preview <span id="prev-role" style="color:#ffe066"></span></h3>
+          <div class="prev-row">
+            <canvas id="prev-src" width="120" height="120"></canvas>
+            <canvas id="prev-stretch" width="220" height="120"></canvas>
+          </div>
+          <p style="font-size:12px;color:#9d8fc0;margin:8px 0 0">
+            Arm a panel/button role, then tune the L/T/R/B insets — the left shows the cut lines,
+            the right shows it stretched. Good insets keep the corners crisp.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      // ---- Role definitions: every UI element the game may need. ------------
+      // type: 'nineslice' (stretchy panel/button → has L/T/R/B insets),
+      //       'bar' (has a fill color), 'image'/'icon' (just a frame).
+      const ROLE_DEFS = [
+        // Panels
+        { key: 'panelBg',      label: 'Main panel background', cat: 'Panels', type: 'nineslice' },
+        { key: 'topbarBg',     label: 'Top bar strip',         cat: 'Panels', type: 'nineslice' },
+        { key: 'settingsBg',   label: 'Settings / menu panel', cat: 'Panels', type: 'nineslice' },
+        { key: 'inventoryBg',  label: 'Inventory panel',       cat: 'Panels', type: 'nineslice' },
+        { key: 'tooltipBg',    label: 'Tooltip / scroll',      cat: 'Panels', type: 'nineslice' },
+        // Buttons
+        { key: 'buttonNormal', label: 'Button (normal)',       cat: 'Buttons', type: 'nineslice' },
+        { key: 'buttonPressed',label: 'Button (pressed)',      cat: 'Buttons', type: 'nineslice' },
+        { key: 'tabActive',    label: 'Tab (active)',          cat: 'Buttons', type: 'nineslice' },
+        { key: 'tabInactive',  label: 'Tab (inactive)',        cat: 'Buttons', type: 'nineslice' },
+        { key: 'iconButton',   label: 'Icon button bg',        cat: 'Buttons', type: 'nineslice' },
+        // Bars
+        { key: 'hpBar',        label: 'Health bar frame',      cat: 'Bars', type: 'bar', fill: '#d64545' },
+        { key: 'mpBar',        label: 'Mana bar frame',        cat: 'Bars', type: 'bar', fill: '#3d7fd6' },
+        { key: 'xpBar',        label: 'XP bar frame',          cat: 'Bars', type: 'bar', fill: '#b45bff' },
+        // Slots
+        { key: 'skillSlot',       label: 'Skill socket',       cat: 'Slots', type: 'image' },
+        { key: 'skillSlotLocked', label: 'Skill socket (locked)', cat: 'Slots', type: 'image' },
+        { key: 'gearSlot',        label: 'Equip / inventory slot', cat: 'Slots', type: 'image' },
+        { key: 'gearSlotLocked',  label: 'Slot (locked)',      cat: 'Slots', type: 'image' },
+        // Icons
+        { key: 'iconBag',      label: 'Bag / inventory',       cat: 'Icons', type: 'icon' },
+        { key: 'iconCoin',     label: 'Gold / coin',           cat: 'Icons', type: 'icon' },
+        { key: 'iconHeart',    label: 'Health',                cat: 'Icons', type: 'icon' },
+        { key: 'iconMana',     label: 'Mana / potion',         cat: 'Icons', type: 'icon' },
+        { key: 'iconHome',     label: 'Base / home',           cat: 'Icons', type: 'icon' },
+        { key: 'iconMenu',     label: 'Overflow menu',         cat: 'Icons', type: 'icon' },
+        { key: 'iconSettings', label: 'Settings (gear)',       cat: 'Icons', type: 'icon' },
+        { key: 'iconExtract',  label: 'Extract / flee',        cat: 'Icons', type: 'icon' },
+        { key: 'iconContinue', label: 'Continue / next',       cat: 'Icons', type: 'icon' },
+        { key: 'iconClose',    label: 'Close (X)',             cat: 'Icons', type: 'icon' },
+        { key: 'iconArrowLeft',label: 'Arrow left',            cat: 'Icons', type: 'icon' },
+        { key: 'iconArrowRight',label: 'Arrow right',          cat: 'Icons', type: 'icon' },
+      ];
+      const DEF = Object.fromEntries(ROLE_DEFS.map((d) => [d.key, d]));
+      const LS_KEY = 'delve-ui-map';
+
+      const $ = (id) => document.getElementById(id);
+      const stage = $('stage'), sheet = $('sheet');
+      let frames = [], byName = {};
+      let roles = {};          // key -> { frame, slice, fill }
+      let selectedFrame = null;
+      let armedRole = null;
+      let zoom = 2, minSize = 14;
+
+      async function boot() {
+        try {
+          const atlas = await (await fetch('/ui-sheet.json')).json();
+          frames = atlas.frames.map((f) => ({ name: f.filename, ...f.frame }));
+          byName = Object.fromEntries(frames.map((f) => [f.name, f]));
+        } catch (e) {
+          $('err').textContent = 'Could not load /ui-sheet.json — ' + e; return;
+        }
+        // Load mapping: localStorage wins (in-progress edits), else the committed file.
+        let saved = null;
+        try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch {}
+        if (!saved) { try { saved = await (await fetch('/ui-map.json')).json(); } catch {} }
+        initRoles(saved);
+
+        sheet.src = '/ui-sheet.png';
+        sheet.onerror = () => ($('err').innerHTML = 'Sheet not found at <b>/ui-sheet.png</b> — put it in src/client/public/.');
+        sheet.onload = () => { renderPicker(); renderRoles(); renderPreview(); };
+        wire();
+      }
+
+      function initRoles(saved) {
+        roles = {};
+        for (const d of ROLE_DEFS) roles[d.key] = { frame: null, ...(d.fill ? { fill: d.fill } : {}) };
+        const sr = (saved && saved.roles) || {};
+        for (const [k, v] of Object.entries(sr)) roles[k] = { ...roles[k], ...v };
+      }
+
+      // ---- Picker -----------------------------------------------------------
+      function renderPicker() {
+        [...stage.querySelectorAll('.frame')].forEach((n) => n.remove());
+        const w = (sheet.naturalWidth || 1024) * zoom, h = (sheet.naturalHeight || 1024) * zoom;
+        sheet.style.width = w + 'px'; sheet.style.height = h + 'px';
+        stage.style.width = w + 'px'; stage.style.height = h + 'px';
+        const q = $('search').value.trim().toLowerCase();
+        for (const f of frames) {
+          if (f.w <= minSize && f.h <= minSize) continue;
+          if (q && !f.name.toLowerCase().includes(q)) continue;
+          const d = document.createElement('div');
+          d.className = 'frame' + (selectedFrame === f.name ? ' sel' : '');
+          d.style.left = f.x * zoom + 'px'; d.style.top = f.y * zoom + 'px';
+          d.style.width = f.w * zoom + 'px'; d.style.height = f.h * zoom + 'px';
+          d.title = `${f.name}  ${f.w}×${f.h}`;
+          d.addEventListener('click', () => pickFrame(f.name));
+          stage.appendChild(d);
+        }
+      }
+
+      function pickFrame(name) {
+        selectedFrame = name;
+        if (armedRole) { roles[armedRole].frame = name; persist(); }
+        renderPicker(); renderRoles(); renderPreview();
+      }
+
+      // ---- Roles panel ------------------------------------------------------
+      function renderRoles() {
+        const el = $('roles');
+        let html = '', cat = '';
+        for (const d of ROLE_DEFS) {
+          if (d.cat !== cat) { cat = d.cat; html += `<div class="cat">${cat}</div>`; }
+          const r = roles[d.key];
+          const armed = armedRole === d.key;
+          html += `<div class="role${armed ? ' armed' : ''}" data-key="${d.key}">
+            <div class="thumb" data-thumb="${d.key}"><canvas width="52" height="52"></canvas></div>
+            <div class="role-body">
+              <div class="role-label">${d.label}<span class="badge">${d.type}</span></div>
+              <div class="role-key">${d.key}</div>
+              <div class="role-frame ${r.frame ? '' : 'none'}">${r.frame || '— unassigned —'}</div>
+              ${extrasHtml(d, r)}
+              <div class="role-actions">
+                <button data-arm="${d.key}">${armed ? 'Click a frame ▲' : 'Assign…'}</button>
+                ${r.frame ? `<button data-clear="${d.key}">Clear</button>` : ''}
+              </div>
+            </div>
+          </div>`;
+        }
+        el.innerHTML = html;
+        // draw thumbnails
+        el.querySelectorAll('[data-thumb]').forEach((t) => {
+          const key = t.getAttribute('data-thumb');
+          drawFrame(t.querySelector('canvas'), roles[key].frame);
+        });
+      }
+
+      function extrasHtml(d, r) {
+        if (d.type === 'nineslice') {
+          const s = r.slice || { left: 8, top: 8, right: 8, bottom: 8 };
+          return `<div class="role-extras">
+            ${['left','top','right','bottom'].map((k) =>
+              `<label>${k[0].toUpperCase()}<input type="number" min="0" data-slice="${d.key}:${k}" value="${s[k] ?? 8}"></label>`
+            ).join('')}
+          </div>`;
+        }
+        if (d.type === 'bar') {
+          return `<div class="role-extras"><label>fill <input type="color" data-fill="${d.key}" value="${r.fill || '#ffffff'}"></label></div>`;
+        }
+        return '';
+      }
+
+      // ---- Preview (nine-slice) --------------------------------------------
+      function renderPreview() {
+        const key = armedRole && DEF[armedRole]?.type === 'nineslice' ? armedRole
+          : (selectedRoleNine());
+        $('prev-role').textContent = key ? '· ' + key : '';
+        const src = $('prev-src'), st = $('prev-stretch');
+        src.getContext('2d').clearRect(0, 0, src.width, src.height);
+        st.getContext('2d').clearRect(0, 0, st.width, st.height);
+        if (!key || !roles[key].frame) return;
+        const f = byName[roles[key].frame]; if (!f) return;
+        const s = roles[key].slice || { left: 8, top: 8, right: 8, bottom: 8 };
+        // source with guide lines
+        const g = src.getContext('2d'); g.imageSmoothingEnabled = false;
+        const sc = Math.min(src.width / f.w, src.height / f.h);
+        const dw = f.w * sc, dh = f.h * sc, ox = (src.width - dw) / 2, oy = (src.height - dh) / 2;
+        g.drawImage(sheet, f.x, f.y, f.w, f.h, ox, oy, dw, dh);
+        g.strokeStyle = '#ff3b6b'; g.lineWidth = 1;
+        for (const [xoff] of [[s.left],[f.w - s.right]]) { g.beginPath(); g.moveTo(ox + xoff*sc, oy); g.lineTo(ox + xoff*sc, oy+dh); g.stroke(); }
+        for (const [yoff] of [[s.top],[f.h - s.bottom]]) { g.beginPath(); g.moveTo(ox, oy + yoff*sc); g.lineTo(ox+dw, oy + yoff*sc); g.stroke(); }
+        // stretched
+        drawNineSlice(st.getContext('2d'), f, s, 6, 6, st.width - 12, st.height - 12);
+      }
+      function selectedRoleNine() {
+        // fall back to the role currently owning the selected frame, if nine-slice
+        return null;
+      }
+
+      function drawFrame(canvas, name) {
+        const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const f = name && byName[name]; if (!f) return;
+        const sc = Math.min(canvas.width / f.w, canvas.height / f.h, 6);
+        const dw = f.w * sc, dh = f.h * sc;
+        ctx.drawImage(sheet, f.x, f.y, f.w, f.h, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+      }
+
+      function drawNineSlice(ctx, f, s, dx, dy, dw, dh) {
+        ctx.imageSmoothingEnabled = false;
+        const { left: l, top: t, right: r, bottom: b } = s;
+        const sx = [f.x, f.x + l, f.x + f.w - r, f.x + f.w];
+        const sy = [f.y, f.y + t, f.y + f.h - b, f.y + f.h];
+        const dX = [dx, dx + l, dx + dw - r, dx + dw];
+        const dY = [dy, dy + t, dy + dh - b, dy + dh];
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+          const swid = sx[i + 1] - sx[i], shei = sy[j + 1] - sy[j];
+          const dwid = dX[i + 1] - dX[i], dhei = dY[j + 1] - dY[j];
+          if (swid <= 0 || shei <= 0 || dwid <= 0 || dhei <= 0) continue;
+          ctx.drawImage(sheet, sx[i], sy[j], swid, shei, dX[i], dY[j], dwid, dhei);
+        }
+      }
+
+      // ---- Persistence / actions -------------------------------------------
+      function currentJson() {
+        const out = { version: 1, sheet: 'ui-sheet.png', roles: {} };
+        for (const d of ROLE_DEFS) {
+          const r = roles[d.key];
+          if (!r.frame) continue;
+          const entry = { frame: r.frame };
+          if (d.type === 'nineslice') entry.slice = r.slice || { left: 8, top: 8, right: 8, bottom: 8 };
+          if (d.type === 'bar') entry.fill = r.fill || '#ffffff';
+          out.roles[d.key] = entry;
+        }
+        return out;
+      }
+      function persist() {
+        localStorage.setItem(LS_KEY, JSON.stringify(currentJson()));
+        const n = Object.keys(currentJson().roles).length;
+        $('status').textContent = `${n}/${ROLE_DEFS.length} roles assigned · autosaved`;
+      }
+
+      function wire() {
+        $('zoom').addEventListener('change', (e) => { zoom = +e.target.value; renderPicker(); });
+        $('minsize').addEventListener('input', (e) => { minSize = +e.target.value; $('minsize-val').textContent = minSize; renderPicker(); });
+        $('search').addEventListener('input', renderPicker);
+
+        $('roles').addEventListener('click', (e) => {
+          const arm = e.target.closest('[data-arm]'); const clr = e.target.closest('[data-clear]'); const th = e.target.closest('[data-thumb]');
+          if (arm) { const k = arm.getAttribute('data-arm'); armedRole = armedRole === k ? null : k; updateArmNote(); renderRoles(); renderPreview(); }
+          else if (clr) { roles[clr.getAttribute('data-clear')].frame = null; persist(); renderRoles(); renderPreview(); }
+          else if (th) { const k = th.getAttribute('data-thumb'); if (roles[k].frame) { selectedFrame = roles[k].frame; scrollToFrame(roles[k].frame); renderPicker(); } }
+        });
+        $('roles').addEventListener('input', (e) => {
+          const sl = e.target.getAttribute('data-slice'); const fl = e.target.getAttribute('data-fill');
+          if (sl) { const [k, side] = sl.split(':'); roles[k].slice = { left:8,top:8,right:8,bottom:8, ...(roles[k].slice||{}) }; roles[k].slice[side] = +e.target.value; persist(); renderPreview(); }
+          else if (fl) { roles[fl].fill = e.target.value; persist(); }
+        });
+
+        $('save').addEventListener('click', () => {
+          const blob = new Blob([JSON.stringify(currentJson(), null, 2)], { type: 'application/json' });
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ui-map.json'; a.click();
+          $('status').textContent = 'Downloaded ui-map.json → drop it in src/client/public/';
+        });
+        $('copy').addEventListener('click', async () => {
+          await navigator.clipboard?.writeText(JSON.stringify(currentJson(), null, 2));
+          $('status').textContent = 'JSON copied to clipboard';
+        });
+        $('addrole').addEventListener('click', () => {
+          const key = prompt('New role key (e.g. iconPotion):'); if (!key) return;
+          const label = prompt('Label:', key) || key;
+          const type = (prompt('Type: image | icon | nineslice | bar', 'icon') || 'icon').trim();
+          ROLE_DEFS.push({ key, label, cat: 'Custom', type });
+          DEF[key] = ROLE_DEFS[ROLE_DEFS.length - 1];
+          roles[key] = { frame: null, ...(type === 'bar' ? { fill: '#ffffff' } : {}) };
+          renderRoles();
+        });
+        $('reset').addEventListener('click', () => {
+          if (!confirm('Clear all assignments (localStorage)?')) return;
+          localStorage.removeItem(LS_KEY); armedRole = null;
+          fetch('/ui-map.json').then((r) => r.json()).then((j) => { initRoles(j); renderRoles(); renderPreview(); persist(); }).catch(() => { initRoles(null); renderRoles(); });
+        });
+        persist();
+      }
+
+      function updateArmNote() {
+        $('armed-note').textContent = armedRole ? `▶ Click a frame to set “${DEF[armedRole].label}”` : '';
+      }
+      function scrollToFrame(name) {
+        const f = byName[name]; if (!f) return;
+        $('left').scrollTo({ left: f.x * zoom - 100, top: f.y * zoom - 100, behavior: 'smooth' });
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "sheet": "ui-sheet.png",
+  "roles": {
+    "panelBg": {
+      "frame": "sprite240",
+      "slice": {
+        "left": 8,
+        "top": 8,
+        "right": 8,
+        "bottom": 8
+      }
+    },
+    "topbarBg": {
+      "frame": "sprite240",
+      "slice": {
+        "left": 8,
+        "top": 8,
+        "right": 8,
+        "bottom": 8
+      }
+    },
+    "settingsBg": {
+      "frame": "sprite463",
+      "slice": {
+        "left": 16,
+        "top": 16,
+        "right": 16,
+        "bottom": 16
+      }
+    },
+    "inventoryBg": {
+      "frame": "sprite1069",
+      "slice": {
+        "left": 8,
+        "top": 8,
+        "right": 8,
+        "bottom": 8
+      }
+    },
+    "tooltipBg": {
+      "frame": "sprite127",
+      "slice": {
+        "left": 8,
+        "top": 8,
+        "right": 8,
+        "bottom": 8
+      }
+    },
+    "buttonNormal": {
+      "frame": "sprite459",
+      "slice": {
+        "left": 8,
+        "top": 8,
+        "right": 8,
+        "bottom": 8
+      }
+    },
+    "buttonPressed": {
+      "frame": "sprite456",
+      "slice": {
+        "left": 8,
+        "top": 8,
+        "right": 8,
+        "bottom": 8
+      }
+    },
+    "tabActive": {
+      "frame": "sprite448",
+      "slice": {
+        "left": 8,
+        "top": 8,
+        "right": 8,
+        "bottom": 8
+      }
+    },
+    "tabInactive": {
+      "frame": "sprite445",
+      "slice": {
+        "left": 8,
+        "top": 8,
+        "right": 8,
+        "bottom": 8
+      }
+    },
+    "iconButton": {
+      "frame": "sprite292",
+      "slice": {
+        "left": 8,
+        "top": 8,
+        "right": 8,
+        "bottom": 8
+      }
+    },
+    "hpBar": {
+      "frame": "sprite340",
+      "fill": "#d64545"
+    },
+    "mpBar": {
+      "frame": "sprite340",
+      "fill": "#3d7fd6"
+    },
+    "xpBar": {
+      "frame": "sprite340",
+      "fill": "#b45bff"
+    },
+    "skillSlot": {
+      "frame": "sprite1149"
+    },
+    "gearSlot": {
+      "frame": "sprite1168"
+    },
+    "iconBag": {
+      "frame": "sprite1300"
+    },
+    "iconCoin": {
+      "frame": "sprite895"
+    },
+    "iconHeart": {
+      "frame": "sprite41"
+    },
+    "iconMana": {
+      "frame": "sprite1384"
+    },
+    "iconHome": {
+      "frame": "sprite753"
+    },
+    "iconMenu": {
+      "frame": "sprite58"
+    },
+    "iconSettings": {
+      "frame": "sprite782"
+    },
+    "iconClose": {
+      "frame": "sprite1199"
+    },
+    "iconArrowLeft": {
+      "frame": "sprite428"
+    },
+    "iconArrowRight": {
+      "frame": "sprite429"
+    }
+  }
+}

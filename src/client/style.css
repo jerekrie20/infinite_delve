@@ -29,47 +29,350 @@ body {
   display: block;
 }
 
-/* HUD overlays the canvas; only the buttons capture input. */
+/* HUD overlays the canvas; only interactive children capture input. Laid out as
+   three stacked regions: top bar, a flexible action layer over the lane, and the
+   opaque control panel pinned to the bottom (matches the wireframe). */
 #hud {
   position: absolute;
   inset: 0;
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
 }
 
-#hud-top {
-  display: flex;
-  justify-content: flex-end;
-  padding: calc(14px + env(safe-area-inset-top)) 16px 0;
-  margin-top: 54px;
-}
+/* ---- Top bar: base · map details · overflow menu ------------------------ */
 
-#hud-bottom {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  padding: 20px 16px calc(28px + env(safe-area-inset-bottom));
-}
-
-/* Small pill button (DAILY). */
-.chip {
+#topbar {
   pointer-events: auto;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  padding: 9px 16px;
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+  background: linear-gradient(rgba(10, 6, 20, 0.85), rgba(10, 6, 20, 0));
+}
+
+.icon-btn {
+  pointer-events: auto;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  color: #ffffff;
+  background: rgba(28, 20, 44, 0.9);
+  cursor: pointer;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+.icon-btn:active {
+  transform: translateY(2px);
+}
+
+#map-details {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.md-title {
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #9d8fc0;
+}
+
+.md-sub {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Action layer floating over the lane -------------------------------- */
+
+#map-actions {
+  flex: 1 1 auto;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 16px 16px;
+}
+
+/* ---- Bottom control panel ----------------------------------------------- */
+
+#panel {
+  pointer-events: auto;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(#1c1430, #140d22);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* Tab switcher (Skills / Equip) */
+#tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.tab-btn {
+  pointer-events: auto;
+  flex: 1 1 0;
+  padding: 9px 8px;
+  font-size: 14px;
   font-weight: bold;
   letter-spacing: 0.5px;
-  color: #ffffff;
-  background: rgba(20, 14, 30, 0.72);
+  color: #9d8fc0;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
   cursor: pointer;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
 }
 
-.chip:active {
-  transform: translateY(2px);
+.tab-btn.active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.tab-page {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tab-page.active {
+  display: flex;
+}
+
+/* Three stat bars (XP / HP / MP) */
+#bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bar-label {
+  flex: 0 0 26px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: #9d8fc0;
+}
+
+.bar-track {
+  flex: 1 1 auto;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+.bar-fill.xp {
+  background: linear-gradient(90deg, #c78bff, #8a5bff);
+}
+.bar-fill.hp {
+  background: linear-gradient(90deg, #6ad07a, #37b04f);
+}
+.bar-fill.mp {
+  background: linear-gradient(90deg, #4aa3ff, #2a6bd0);
+  opacity: 0.4; /* placeholder — mana isn't a real resource yet */
+}
+
+.bar-val {
+  flex: 0 0 auto;
+  min-width: 56px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: bold;
+  color: #cbc3dd;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Five skill circles */
+#skills {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.skill-slot {
+  flex: 1 1 0;
+  aspect-ratio: 1 / 1;
+  max-width: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  background: radial-gradient(rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.25));
+  color: #6f6690;
+}
+
+.skill-slot.locked {
+  cursor: default;
+}
+
+/* Gear grid (inline equipped slots) + money + bag */
+#gear-area {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+#gear-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.gslot {
+  pointer-events: auto;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+
+.gslot.empty {
+  opacity: 0.55;
+}
+
+.gslot.locked {
+  cursor: default;
+  opacity: 0.4;
+  font-size: 16px;
+}
+
+.gslot:not(.locked):active {
+  transform: translateY(1px);
+}
+
+#gear-side {
+  flex: 0 0 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.money {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffe066;
+  border-radius: 12px;
+  background: rgba(255, 224, 102, 0.1);
+  border: 1px solid rgba(255, 224, 102, 0.25);
+}
+
+.bag-btn {
+  pointer-events: auto;
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(40, 192, 208, 0.16);
+  cursor: pointer;
+}
+
+.bag-btn:active {
+  transform: translateY(1px);
+}
+
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #120c1c;
+  background: #ffe066;
+  border-radius: 999px;
+}
+
+/* Overflow menu list (blue-arrow panel) */
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: bold;
+  text-align: left;
+  color: #ece7f5;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+
+.menu-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.menu-item .soon {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #9d8fc0;
 }
 
 .btn {
@@ -143,6 +446,81 @@ body {
   color: #cbc3dd;
   background: rgba(255, 255, 255, 0.08);
   cursor: pointer;
+}
+
+/* Item detail popup — mobile tap-to-inspect. Reuses .panel-backdrop for the
+   dimmed overlay; the card is a compact, centered sheet. */
+.item-card {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  padding: 26px 20px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(#1c1430, #140d22);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  color: #ece7f5;
+  text-align: center;
+}
+
+.ip-sprite {
+  width: 96px;
+  height: 96px;
+  margin: 6px auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 46px;
+  border-radius: 16px;
+  border: 2px solid #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ip-name {
+  font-size: 19px;
+  font-weight: bold;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.ip-tag {
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #9d8fc0;
+  margin-top: 3px;
+}
+
+.ip-stats {
+  margin: 14px auto 0;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ip-stat {
+  font-size: 15px;
+  font-weight: bold;
+  color: #dfe9ff;
+}
+
+.ip-set {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #7fe0a0;
+}
+
+.ip-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.ip-actions .gear-btn {
+  flex: 1 1 auto;
+  padding: 11px 12px;
+  font-size: 14px;
 }
 
 .panel-title {
@@ -267,4 +645,205 @@ body {
 
 .you-rank b {
   color: #ffffff;
+}
+
+/* ---- Gear panel --------------------------------------------------------- */
+
+.hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 4px 0 4px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #ece7f5;
+}
+
+.gear-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 15px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.gear-slot + .gear-slot {
+  margin-top: 4px;
+}
+
+.gear-slot.empty {
+  opacity: 0.55;
+}
+
+.slot-label {
+  flex: 0 0 62px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #9d8fc0;
+}
+
+.slot-item {
+  flex: 1 1 auto;
+  min-width: 0; /* let it shrink so long names wrap instead of clipping/hiding */
+  overflow-wrap: anywhere;
+  font-weight: bold;
+}
+
+.slot-item em {
+  font-style: normal;
+  font-weight: normal;
+  color: #cbc3dd;
+  font-size: 13px;
+}
+
+.slot-item.muted {
+  color: #6f6690;
+  font-weight: normal;
+}
+
+.group-header {
+  margin: 12px 0 5px;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #9d8fc0;
+}
+
+/* Set-bonus rows: active thresholds glow, inactive ones sit dim. */
+.gear-set {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  background: rgba(120, 200, 140, 0.08);
+  border: 1px solid rgba(120, 200, 140, 0.18);
+}
+
+.gear-set + .gear-set {
+  margin-top: 4px;
+}
+
+.set-name {
+  flex: 0 0 auto;
+  font-weight: bold;
+  color: #7fe0a0;
+}
+
+.set-name em {
+  font-style: normal;
+  color: #9d8fc0;
+  font-size: 12px;
+}
+
+.set-lines {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.set-bonus {
+  font-size: 12px;
+}
+
+.set-bonus.on {
+  color: #7fe0a0;
+  font-weight: bold;
+}
+
+.set-bonus.off {
+  color: #6f6690;
+}
+
+.stash-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.stash-item + .stash-item {
+  margin-top: 3px;
+}
+
+.item-info {
+  flex: 1 1 auto;
+  min-width: 0; /* shrinkable so the name wraps rather than hides */
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.item-name {
+  overflow-wrap: anywhere;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+.item-stat {
+  font-size: 13px;
+  color: #cbc3dd;
+}
+
+/* Tap-to-inspect rows (equipped + stash) open the item popup. */
+.tappable {
+  cursor: pointer;
+}
+.tappable:hover,
+.tappable:active {
+  background: rgba(255, 255, 255, 0.09);
+}
+.row-chevron {
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+  color: #6f6690;
+}
+.item-sell {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: bold;
+  color: #ffe066;
+}
+
+.item-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
+.gear-btn.sell {
+  border-color: rgba(255, 224, 102, 0.4);
+  background: rgba(255, 224, 102, 0.14);
+  color: #ffe066;
+}
+
+.gear-btn {
+  flex: 0 0 auto;
+  pointer-events: auto;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #ece7f5;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.gear-btn.equip {
+  border-color: rgba(40, 192, 208, 0.5);
+  background: rgba(40, 192, 208, 0.18);
+}
+
+.gear-btn:active {
+  transform: translateY(1px);
 }

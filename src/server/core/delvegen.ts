@@ -88,20 +88,20 @@ const DECOR_KINDS: readonly DecorKind[] = ['rock', 'bush', 'flowers', 'log', 'mu
 
 /** Base gear pool for ordinary scattered loot. */
 const GEAR_POOL: readonly Omit<GearItem, 'id'>[] = [
-  { name: 'Rusty Sword', slot: 'hand1', rarity: 'common', stats: { attack: 2 } },
-  { name: 'Oak Buckler', slot: 'hand2', rarity: 'common', stats: { defensePct: 5, maxHp: 3 } },
-  { name: 'Leather Cap', slot: 'head', rarity: 'common', stats: { maxHp: 4 } },
-  { name: 'Padded Vest', slot: 'body', rarity: 'common', stats: { maxHp: 6, defensePct: 3 } },
-  { name: 'Worn Boots', slot: 'feet', rarity: 'common', stats: { maxHp: 3 } },
-  { name: 'Meadow Charm', slot: 'amulet', rarity: 'uncommon', stats: { attack: 2, maxHp: 5 } },
+  { name: 'Rusty Sword', slot: 'hand1', rarity: 'common', base: 'blade', stats: { attack: 2 } },
+  { name: 'Oak Buckler', slot: 'hand2', rarity: 'common', base: 'buckler', stats: { defensePct: 5, maxHp: 3 } },
+  { name: 'Leather Cap', slot: 'head', rarity: 'common', base: 'helm', stats: { maxHp: 4 } },
+  { name: 'Padded Vest', slot: 'body', rarity: 'common', base: 'armor', stats: { maxHp: 6, defensePct: 3 } },
+  { name: 'Worn Boots', slot: 'feet', rarity: 'common', base: 'boots', stats: { maxHp: 3 } },
+  { name: 'Meadow Charm', slot: 'amulet', rarity: 'uncommon', base: 'amulet', stats: { attack: 2, maxHp: 5 } },
 ];
 
 /** Richer pool — POIs guarantee a drop from here, so detours are worth it. */
 const POI_GEAR_POOL: readonly Omit<GearItem, 'id'>[] = [
-  { name: 'Grove Warden Blade', slot: 'hand1', rarity: 'rare', stats: { attack: 5 } },
-  { name: 'Mesa Aegis', slot: 'hand2', rarity: 'rare', stats: { defensePct: 10, maxHp: 8 } },
-  { name: 'Sunken Circlet', slot: 'head', rarity: 'epic', stats: { maxHp: 12, attack: 3 } },
-  { name: 'Warden Cloak', slot: 'body', rarity: 'rare', stats: { maxHp: 10, defensePct: 4 } },
+  { name: 'Grove Warden Blade', slot: 'hand1', rarity: 'rare', base: 'blade', stats: { attack: 5 } },
+  { name: 'Mesa Aegis', slot: 'hand2', rarity: 'rare', base: 'buckler', stats: { defensePct: 10, maxHp: 8 } },
+  { name: 'Sunken Circlet', slot: 'head', rarity: 'epic', base: 'helm', stats: { maxHp: 12, attack: 3 } },
+  { name: 'Warden Cloak', slot: 'body', rarity: 'rare', base: 'armor', stats: { maxHp: 10, defensePct: 4 } },
 ];
 
 const idx = (x: number, y: number, w: number) => y * w + x;

@@ -1,4 +1,13 @@
-import type { Hero, HeroResponse, RunOutcome, RunResultResponse } from '../shared/delve';
+import type {
+  EquipResponse,
+  GearItem,
+  GearSlot,
+  Hero,
+  HeroResponse,
+  RunOutcome,
+  RunResultResponse,
+  SellResponse,
+} from '../shared/delve';
 import type { DailyResponse } from '../shared/daily';
 
 /** Used when the API isn't reachable (local vite preview, before Devvit
@@ -8,10 +17,12 @@ const MOCK_HERO: Hero = {
   level: 1,
   xp: 0,
   xpToNext: 20,
-  hp: 30,
-  maxHp: 30,
+  hp: 40,
+  maxHp: 40,
   attack: 6,
   defense: 5,
+  critChance: 5,
+  lifesteal: 0,
   gold: 0,
   bestDepth: 1,
   stash: [],
@@ -69,17 +80,55 @@ export async function fetchDaily(): Promise<DailyResponse> {
   }
 }
 
+/** Equip a stash item, or unequip a slot (exactly one). Returns the updated
+ *  hero, or null if the API is unreachable (client applies the change locally). */
+export async function postEquip(
+  itemId?: string,
+  unequip?: GearSlot
+): Promise<EquipResponse | null> {
+  try {
+    const res = await fetch('/api/equip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId, unequip }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as EquipResponse;
+  } catch (err) {
+    console.warn('[delve] /api/equip unavailable — local only', err);
+    return null;
+  }
+}
+
+/** Sell a stash item for gold. Returns the updated hero + gold gained, or null
+ *  if the API is unreachable (client applies the sale locally). */
+export async function postSell(itemId: string): Promise<SellResponse | null> {
+  try {
+    const res = await fetch('/api/sell', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as SellResponse;
+  } catch (err) {
+    console.warn('[delve] /api/sell unavailable — local only', err);
+    return null;
+  }
+}
+
 /** Bank an active run. Returns the server's authoritative result, or null if
  *  the API is unreachable (client then falls back to local-only bookkeeping). */
 export async function postRunResult(
   outcome: RunOutcome,
-  depthReached: number
+  depthReached: number,
+  haul: GearItem[] = []
 ): Promise<RunResultResponse | null> {
   try {
     const res = await fetch('/api/run/result', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ outcome, depthReached }),
+      body: JSON.stringify({ outcome, depthReached, haul }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return (await res.json()) as RunResultResponse;

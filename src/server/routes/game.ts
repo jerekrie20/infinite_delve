@@ -9,11 +9,25 @@
 import { Hono } from 'hono';
 import { context, redis, reddit } from '@devvit/web/server';
 import type {
+  EquipRequest,
+  EquipResponse,
   HeroResponse,
   RunResultRequest,
   RunResultResponse,
+  SellRequest,
+  SellResponse,
 } from '../../shared/delve';
-import { applyRun, collectIdle, getOrCreateHero, saveHero, toHero } from '../core/hero';
+import {
+  applyRun,
+  collectIdle,
+  equipItem,
+  getOrCreateHero,
+  saveHero,
+  sellItem,
+  toHero,
+  unequipSlot,
+} from '../core/hero';
+import { sanitizeHaul } from '../../shared/content/items';
 import { recordRun } from '../core/frontier';
 
 type ErrorResponse = { error: string };
@@ -54,8 +68,10 @@ game.post('/run/result', async (c) => {
         ? Math.max(0, Math.min(Math.floor(body.depthReached), 100000))
         : 0;
 
+    const haul = outcome === 'extracted' ? sanitizeHaul(body.haul, depthReached) : [];
+
     const hero = await getOrCreateHero(uid);
-    const gained = applyRun(hero, outcome, depthReached);
+    const gained = applyRun(hero, outcome, depthReached, haul);
     await saveHero(uid, hero);
 
     // Meta loop: record the run into today's per-sub board + co-op frontier.
@@ -71,5 +87,51 @@ game.post('/run/result', async (c) => {
   } catch (error) {
     console.error('POST /api/run/result error:', error);
     return c.json<ErrorResponse>({ error: 'Failed to submit run result' }, 500);
+  }
+});
+
+game.post('/equip', async (c) => {
+  try {
+    const uid = playerId();
+
+    let body: EquipRequest;
+    try {
+      body = await c.req.json<EquipRequest>();
+    } catch {
+      return c.json<ErrorResponse>({ error: 'Invalid JSON body' }, 400);
+    }
+
+    const hero = await getOrCreateHero(uid);
+    let changed = false;
+    if (typeof body.itemId === 'string') changed = equipItem(hero, body.itemId);
+    else if (typeof body.unequip === 'string') changed = unequipSlot(hero, body.unequip);
+    if (changed) await saveHero(uid, hero);
+
+    return c.json<EquipResponse>({ hero: toHero(hero) });
+  } catch (error) {
+    console.error('POST /api/equip error:', error);
+    return c.json<ErrorResponse>({ error: 'Failed to update gear' }, 500);
+  }
+});
+
+game.post('/sell', async (c) => {
+  try {
+    const uid = playerId();
+
+    let body: SellRequest;
+    try {
+      body = await c.req.json<SellRequest>();
+    } catch {
+      return c.json<ErrorResponse>({ error: 'Invalid JSON body' }, 400);
+    }
+
+    const hero = await getOrCreateHero(uid);
+    const goldGained = typeof body.itemId === 'string' ? sellItem(hero, body.itemId) : 0;
+    if (goldGained > 0) await saveHero(uid, hero);
+
+    return c.json<SellResponse>({ hero: toHero(hero), goldGained });
+  } catch (error) {
+    console.error('POST /api/sell error:', error);
+    return c.json<ErrorResponse>({ error: 'Failed to sell item' }, 500);
   }
 });
