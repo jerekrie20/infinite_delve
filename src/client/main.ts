@@ -48,10 +48,10 @@ async function boot(): Promise<void> {
   document.getElementById('hud')?.style.setProperty('display', 'none');
 
   const hooks: HudHooks = {
-    extract: () => lane()?.extract(),
     openGear: openGearPanel,
     openBase: () => document.getElementById('base-panel')?.classList.add('show'),
     openMenu: () => document.getElementById('menu-panel')?.classList.add('show'),
+    cast: (abilityId: string) => lane()?.castAbility(abilityId),
   };
   game.scene.add('HudScene', HudScene, true, { hooks, hero });
 

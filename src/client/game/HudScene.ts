@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GearSlot, Hero } from '../../shared/delve';
 import { formatShort, type HudSnapshot } from '../ui/hud';
 import { openItemPopup } from '../ui/gear';
+import { ACTIVES } from '../../shared/content/actives';
 
 /** The main-page HUD rendered as Phaser canvas objects, skinned with the wooden
  *  UI kit via ui-map.json (role → atlas frame + nine-slice insets + bar fills).
@@ -13,10 +14,10 @@ interface Role { frame: string; slice?: Slice; fill?: string }
 interface UiMap { roles: Record<string, Role> }
 
 export interface HudHooks {
-  extract: () => void;
   openGear: () => void;
   openBase: () => void;
   openMenu: () => void;
+  cast: (abilityId: string) => void;
 }
 
 const DEFAULT_SLICE: Slice = { left: 8, top: 8, right: 8, bottom: 8 };
@@ -38,7 +39,6 @@ export class HudScene extends Phaser.Scene {
 
   private depthText!: Phaser.GameObjects.Text;
   private moneyText!: Phaser.GameObjects.Text;
-  private extractText!: Phaser.GameObjects.Text;
   private barGfx!: Phaser.GameObjects.Graphics;
   private tabSkills!: Phaser.GameObjects.NineSlice;
   private tabEquip!: Phaser.GameObjects.NineSlice;
@@ -46,9 +46,23 @@ export class HudScene extends Phaser.Scene {
   private tabEquipText!: Phaser.GameObjects.Text;
   private skillsView!: Phaser.GameObjects.Container;
   private equipView!: Phaser.GameObjects.Container;
+  private summaryView!: Phaser.GameObjects.Container;
+  private summaryTexts: Phaser.GameObjects.Text[] = [];
+  private tabSummary!: Phaser.GameObjects.NineSlice;
+  private tabSummaryText!: Phaser.GameObjects.Text;
   private gearDots: Array<Phaser.GameObjects.Arc | null> = [];
   private bagBadge!: Phaser.GameObjects.Container;
   private bagBadgeText!: Phaser.GameObjects.Text;
+
+  // Skill slot state
+  private skillSlots: Array<{
+    bg: Phaser.GameObjects.Image;
+    icon: Phaser.GameObjects.Text;
+    label: Phaser.GameObjects.Text;
+    mana: Phaser.GameObjects.Text;
+    cdOverlay: Phaser.GameObjects.Graphics;
+  }> = [];
+  private cooldowns: Record<string, number> = {}; // abilityId → remaining ms
 
   constructor() {
     super('HudScene');
@@ -59,6 +73,7 @@ export class HudScene extends Phaser.Scene {
     this.hero = data.hero;
     this.hp = data.hero.hp;
     this.maxHp = data.hero.maxHp;
+    this.cooldowns = {};
   }
 
   preload(): void {
@@ -70,15 +85,16 @@ export class HudScene extends Phaser.Scene {
     this.map = (this.cache.json.get('uimap') as UiMap)?.roles ?? {};
 
     this.buildTopBar();
-    this.buildExtract();
     this.buildPanel();
 
     // Live data wiring (game-global bus; survives scene restarts).
     this.game.events.on('hud-changed', this.onHud, this);
     this.game.events.on('hero-changed', this.onHero, this);
+    this.game.events.on('run-reset', () => { this.cooldowns = {}; }, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('hud-changed', this.onHud, this);
       this.game.events.off('hero-changed', this.onHero, this);
+      this.game.events.off('run-reset');
     });
 
     this.repaintAll();
@@ -135,29 +151,28 @@ export class HudScene extends Phaser.Scene {
     this.depthText = this.label(400, 70, 'Depth 1', 30, '#ffffff', 'center');
   }
 
-  private buildExtract(): void {
-    const btn = this.nine('buttonNormal', 230, 718, 340, 84);
-    btn?.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.hooks.extract());
-    this.extractText = this.label(400, 760, 'EXTRACT', 28, '#ffffff', 'center');
-  }
-
   private buildPanel(): void {
     this.nine('panelBg', 6, 812, 788, 468);
 
-    // Tabs
-    this.tabSkills = this.mkTab(40, 832, 352, 60, 'skills');
-    this.tabSkillsText = this.label(40 + 176, 862, '⚡ Skills', 24, '#ffffff', 'center');
-    this.tabEquip = this.mkTab(408, 832, 352, 60, 'equip');
-    this.tabEquipText = this.label(408 + 176, 862, '🎒 Equip', 24, '#b9add6', 'center');
+    // Tabs — three: Skills, Equip, Summary
+    const tabW = 252;
+    this.tabSkills = this.mkTab(6, 832, tabW, 60, 'skills');
+    this.tabSkillsText = this.label(6 + tabW / 2, 862, '⚡ Skills', 22, '#ffffff', 'center');
+    this.tabSummary = this.mkTab(6 + tabW, 832, tabW, 60, 'summary');
+    this.tabSummaryText = this.label(6 + tabW * 1.5, 862, '📋 Summary', 22, '#b9add6', 'center');
+    this.tabEquip = this.mkTab(6 + tabW * 2, 832, tabW, 60, 'equip');
+    this.tabEquipText = this.label(6 + tabW * 2.5, 862, '🎒 Equip', 22, '#b9add6', 'center');
 
     this.skillsView = this.add.container(0, 0);
     this.equipView = this.add.container(0, 0);
+    this.summaryView = this.add.container(0, 0);
     this.buildSkillsView();
     this.buildEquipView();
+    this.buildSummaryView();
     this.setTab('skills');
   }
 
-  private mkTab(x: number, y: number, w: number, h: number, which: 'skills' | 'equip'): Phaser.GameObjects.NineSlice {
+  private mkTab(x: number, y: number, w: number, h: number, which: 'skills' | 'equip' | 'summary'): Phaser.GameObjects.NineSlice {
     const n = this.nine(which === 'skills' ? 'tabActive' : 'tabInactive', x, y, w, h)!;
     n.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.setTab(which));
     return n;
@@ -170,15 +185,49 @@ export class HudScene extends Phaser.Scene {
     for (const [i, name] of ['XP', 'HP', 'MP'].entries()) {
       this.skillsView.add(this.label(40, 930 + i * 40 + 14, name, 20, '#9d8fc0', 'left'));
     }
-    // Five skill sockets (locked placeholders).
+
+    // Skill slots — real buttons for unlocked abilities, locked placeholder for rest.
+    this.skillSlots = [];
     const size = 104, gap = (720 - size * 5) / 4;
     for (let i = 0; i < 5; i++) {
       const cx = 40 + size / 2 + i * (size + gap);
-      const s = this.icon('skillSlot', cx, 1104, size);
-      if (s) { s.setTint(0x9a9a9a); s.setAlpha(0.85); this.skillsView.add(s); }
-      const lock = this.label(cx, 1104, '🔒', 26, '#6f6690', 'center');
-      this.skillsView.add(lock);
+      const abilityId = this.hero.abilities[i] ?? null;
+      const def = abilityId ? ACTIVES[abilityId] : null;
+
+      // Slot background
+      const bg = this.icon('skillSlot', cx, 1104, size);
+      if (!bg) continue;
+      if (!def) { bg.setTint(0x555555); bg.setAlpha(0.5); }
+      this.skillsView.add(bg);
+
+      const cdGfx = this.add.graphics();
+      this.skillsView.add(cdGfx);
+
+      if (def) {
+        // Real ability button
+        const icon = this.label(cx, 1088, def.icon, 30, '#ffffff', 'center');
+        const label = this.label(cx, 1136, def.name, 16, '#d0c8e8', 'center');
+        const mana = this.label(cx, 1152, `${def.manaCost}◆`, 14, '#4aa3ff', 'center');
+        this.skillsView.add(icon);
+        this.skillsView.add(label);
+        this.skillsView.add(mana);
+        bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.tapSkill(i, abilityId!, def.manaCost, def.cooldownMs));
+        this.skillSlots.push({ bg, icon, label, mana, cdOverlay: cdGfx });
+      } else {
+        // Locked placeholder
+        const lock = this.label(cx, 1104, '🔒', 26, '#6f6690', 'center');
+        this.skillsView.add(lock);
+        this.skillSlots.push({ bg, icon: lock, label: lock, mana: lock, cdOverlay: cdGfx });
+      }
     }
+  }
+
+  /** Tap a skill button — validate mana + cooldown, then fire. */
+  private tapSkill(_idx: number, abilityId: string, manaCost: number, cdMs: number): void {
+    if (this.cooldowns[abilityId] && this.cooldowns[abilityId]! > 0) return; // on cooldown
+    if (this.hero.mana < manaCost) return; // insufficient mana
+    this.cooldowns[abilityId] = cdMs;
+    this.hooks.cast(abilityId);
   }
 
   private buildEquipView(): void {
@@ -229,13 +278,69 @@ export class HudScene extends Phaser.Scene {
 
   // ---- tab switching ---------------------------------------------------------
 
-  private setTab(which: 'skills' | 'equip'): void {
+  private buildSummaryView(): void {
+    // 5 empty turn rows — filled by onHud from combatTurns
+    for (let i = 0; i < 5; i++) {
+      const y = 920 + i * 36;
+      const t = this.label(40, y, '', 18, '#6f6690', 'left');
+      this.summaryView.add(t);
+      this.summaryTexts.push(t);
+    }
+  }
+
+  private setTab(which: 'skills' | 'equip' | 'summary'): void {
     this.skillsView.setVisible(which === 'skills');
     this.equipView.setVisible(which === 'equip');
+    this.summaryView.setVisible(which === 'summary');
     this.tabSkills.setTexture('ui', this.map[which === 'skills' ? 'tabActive' : 'tabInactive']?.frame);
+    this.tabSummary.setTexture('ui', this.map[which === 'summary' ? 'tabActive' : 'tabInactive']?.frame);
     this.tabEquip.setTexture('ui', this.map[which === 'equip' ? 'tabActive' : 'tabInactive']?.frame);
     this.tabSkillsText.setColor(which === 'skills' ? '#ffffff' : '#b9add6');
+    this.tabSummaryText.setColor(which === 'summary' ? '#ffffff' : '#b9add6');
     this.tabEquipText.setColor(which === 'equip' ? '#ffffff' : '#b9add6');
+  }
+
+  // ---- cooldown tick -----------------------------------------------------------
+
+  override update(_time: number, delta: number): void {
+    // Decrement ability cooldowns and redraw overlays.
+    for (const [id, ms] of Object.entries(this.cooldowns)) {
+      if (ms <= 0) continue;
+      const remaining = ms - delta;
+      this.cooldowns[id] = Math.max(0, remaining);
+    }
+    this.drawCooldowns();
+  }
+
+  private drawCooldowns(): void {
+    const size = 104, gap = (720 - size * 5) / 4;
+    for (let i = 0; i < 5; i++) {
+      const slot = this.skillSlots[i];
+      if (!slot) continue;
+      const abilityId = this.hero.abilities[i] ?? null;
+      const def = abilityId ? ACTIVES[abilityId] : null;
+      const cd = abilityId ? (this.cooldowns[abilityId] ?? 0) : 0;
+
+      const g = slot.cdOverlay;
+      g.clear();
+      if (cd > 0 && def) {
+        const cx = 40 + size / 2 + i * (size + gap);
+        // Dark overlay + remaining seconds text
+        g.fillStyle(0x000000, 0.55);
+        g.fillRoundedRect(cx - size / 2, 1104 - size / 2, size, size, 12);
+        // We draw the text via the existing label (reuse icon text for cd display)
+        slot.icon.setText(Math.ceil(cd / 1000).toString());
+        slot.icon.setFontSize(22).setColor('#ffb020');
+      } else if (def) {
+        slot.icon.setText(def.icon).setFontSize(30).setColor('#ffffff');
+        // Dim if insufficient mana
+        if (this.hero.mana < def.manaCost) {
+          g.fillStyle(0x000000, 0.3);
+          const cx = 40 + size / 2 + i * (size + gap);
+          g.fillRoundedRect(cx - size / 2, 1104 - size / 2, size, size, 12);
+        }
+      }
+    }
   }
 
   // ---- live updates ----------------------------------------------------------
@@ -246,11 +351,11 @@ export class HudScene extends Phaser.Scene {
     this.maxHp = s.maxHp;
     this.depthText.setText(`Depth ${s.depth}`);
     this.moneyText.setText(formatShort(s.bankedGold));
-    this.extractText.setText(s.runGold > 0 ? `EXTRACT  +${formatShort(s.runGold)}◆` : 'EXTRACT');
     if (s.haulCount > 0) { this.bagBadge.setVisible(true); this.bagBadgeText.setText(String(s.haulCount)); }
     else this.bagBadge.setVisible(false);
     this.drawBars();
     this.drawGear();
+    this.drawSummary(s.combatTurns ?? []);
   }
 
   private onHero(h: Hero): void {
@@ -271,7 +376,8 @@ export class HudScene extends Phaser.Scene {
     g.clear();
     const xpFrac = this.hero.xpToNext > 0 ? this.hero.xp / this.hero.xpToNext : 0;
     const hpFrac = this.maxHp > 0 ? this.hp / this.maxHp : 0;
-    const rows: Array<[string, number]> = [['xpBar', xpFrac], ['hpBar', hpFrac], ['mpBar', 1]];
+    const mpFrac = this.hero.maxMana > 0 ? this.hero.mana / this.hero.maxMana : 0;
+    const rows: Array<[string, number]> = [['xpBar', xpFrac], ['hpBar', hpFrac], ['mpBar', mpFrac]];
     rows.forEach(([key, frac], i) => this.bar(g, key, 96, 930 + i * 40, 664, 26, frac));
   }
 
@@ -294,6 +400,30 @@ export class HudScene extends Phaser.Scene {
         dot.setVisible(true).setFillStyle(hex);
       } else dot.setVisible(false);
     });
+  }
+
+  private drawSummary(turns: import('../../shared/delve').CombatTurn[]): void {
+    for (let i = 0; i < 5; i++) {
+      const t = this.summaryTexts[i];
+      if (!t) continue;
+      const turn = turns[i];
+      if (!turn) { t.setText('').setColor('#6f6690'); continue; }
+      const fmt = (_side: 'hero' | 'monster', action: string, dmg: number, crit: boolean): string => {
+        if (!action) return '—';
+        if (action === 'dodged') return 'missed';
+        if (action === 'blocked') return 'blocked';
+        if (action === 'execute') return 'EXECUTED!';
+        const d = `${dmg}${crit ? '💥' : ''}`;
+        if (action === 'attack') return `hit ${d}`;
+        return `${action} ${d}`;
+      };
+      const heroStr = fmt('hero', turn.heroAction, turn.heroDmg, turn.heroCrit);
+      const monStr = fmt('monster', turn.monsterAction, turn.monsterDmg, turn.monsterCrit);
+      const line = `D${turn.depth}  ⚔️${heroStr.padEnd(16)} 🛡️${monStr}`;
+      t.setText(line);
+      const heroWinning = turn.heroDmg > turn.monsterDmg;
+      t.setColor(heroWinning ? '#5bd06a' : turn.heroDmg === turn.monsterDmg ? '#b9add6' : '#ff5470');
+    }
   }
 
   /** Tap an equipped slot → item-detail popup (mobile inspect); empty → inventory. */

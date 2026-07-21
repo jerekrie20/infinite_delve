@@ -8,6 +8,8 @@ import type { GearSlot, Hero } from '../../shared/delve';
 import { itemName } from '../../shared/content/items';
 import { openGearPanel } from './gear';
 
+import type { CombatTurn } from '../../shared/delve';
+
 /** Live combat + hero state the HUD paints from. */
 export interface HudSnapshot {
   depth: number;
@@ -19,6 +21,8 @@ export interface HudSnapshot {
   hp: number;
   maxHp: number;
   hero: Hero;
+  /** Last 5 combat turns for the summary tab. */
+  combatTurns?: CombatTurn[];
 }
 
 /** Inline equipped slots shown on the main page, in display order. Six real

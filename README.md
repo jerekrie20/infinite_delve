@@ -22,7 +22,7 @@ subreddit on a shared daily challenge.
 - `src/server` — the Hono app (`index.ts`), HTTP routes, and `core/` game logic
   (hero, frontier). Access `redis`, `reddit`, and `context` via `@devvit/web/server`.
 - `src/shared` — types + pure math shared by client and server.
-- `game_design/` — the design vault (open as an [Obsidian](https://obsidian.md) vault).
+- `game_design_old/` — the design vault (open as an [Obsidian](https://obsidian.md) vault).
 
 ## Develop
 
@@ -33,5 +33,5 @@ subreddit on a shared daily challenge.
   runtime); resize the browser to mobile/portrait.
 - **`npm run type-check`** / **`npm run lint`** — the green-bar checks.
 
-See [`AGENTS.md`](AGENTS.md) for stack conventions and [`game_design/`](game_design/)
+See [`AGENTS.md`](AGENTS.md) for stack conventions and [`game_design_old/`](game_design_old/)
 for the design.

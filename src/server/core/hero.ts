@@ -17,6 +17,7 @@ import {
   sellItem as sellItemState,
   unequipSlot as unequipSlotState,
 } from '../../shared/content/gear';
+import { unlockedAbilities } from '../../shared/content/actives';
 
 /** Persisted subset (Redis). Derived combat stats are recomputed on read. */
 export interface StoredHero {
@@ -120,6 +121,7 @@ function recompute(h: StoredHero): void {
 /** Shape a StoredHero into the client-facing Hero (adds derived stats). */
 export function toHero(h: StoredHero): Hero {
   const d = deriveStats(h.class, h.level, h.equipped);
+  const maxMana = TUNING.hero.baseMana + TUNING.hero.manaPerLevel * (h.level - 1);
   return {
     class: h.class,
     level: h.level,
@@ -135,6 +137,9 @@ export function toHero(h: StoredHero): Hero {
     dodge: d.dodgeChance,
     hpRegen: d.hpRegen,
     goldFind: d.goldFindPct,
+    mana: maxMana, // mana resets to full on read (between runs)
+    maxMana,
+    abilities: unlockedAbilities(h.class, h.level),
     gold: h.gold,
     bestDepth: h.bestDepth,
     stash: h.stash,

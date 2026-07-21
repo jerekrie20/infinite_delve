@@ -5,7 +5,7 @@ status: living
 
 # Delve — design vault
 
-Home base for the game design. Open the `game_design/` folder as an **Obsidian
+Home base for the game design. Open the `/` folder as an **Obsidian
 vault**. Use quick-search (Ctrl/Cmd-O), the **graph view** to see how systems
 connect, and the **backlinks** panel at the bottom of each note.
 

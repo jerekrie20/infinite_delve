@@ -62,6 +62,6 @@ Server stays TypeScript. Limit: 100 MB / 30 s per upload.
 
 ## Obsidian — this vault
 
-Not a project tool, but *the* doc tool: open `game_design/` as a vault for
+Not a project tool, but *the* doc tool: open `/` as a vault for
 search, the graph view (system connections), backlinks, and `[[wikilink]]`
 navigation. See [[Home]].

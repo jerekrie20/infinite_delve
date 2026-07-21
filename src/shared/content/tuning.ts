@@ -9,6 +9,12 @@ export interface HeroTuning {
   /** xpToNext(level) = xpCurveBase * level ^ xpCurveExp. */
   xpCurveBase: number;
   xpCurveExp: number;
+  /** Base mana at level 1. */
+  baseMana: number;
+  /** Extra mana per level. */
+  manaPerLevel: number;
+  /** Fraction of max mana regenerated per second (0.04 = 4%/s). */
+  manaRegenPct: number;
 }
 
 export interface MonsterTuning {
@@ -98,6 +104,9 @@ export const TUNING: Tuning = {
     levelCap: 100,
     xpCurveBase: 20,
     xpCurveExp: 1.5,
+    baseMana: 50,
+    manaPerLevel: 5,
+    manaRegenPct: 0.04,
   },
   monster: {
     // Gentle HP/attack scaling so a fixed-attack fresh hero reaches ~depth 10;
@@ -124,7 +133,7 @@ export const TUNING: Tuning = {
     passiveBudgetPerDepth: 0.3,
   },
   combat: {
-    attackIntervalMs: 600,
+    attackIntervalMs: 2000,
     critChance: 0.05,
     critMultiplier: 1.5,
     damageVariance: 0.1,

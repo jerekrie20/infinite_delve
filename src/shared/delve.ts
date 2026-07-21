@@ -25,6 +25,17 @@ export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
 export type MonsterRarity = 'normal' | 'elite' | 'boss';
 
+/** One combat exchange for the summary tab. */
+export interface CombatTurn {
+  depth: number;
+  heroAction: string;
+  heroDmg: number;
+  heroCrit: boolean;
+  monsterAction: string;
+  monsterDmg: number;
+  monsterCrit: boolean;
+}
+
 /** Stat bonuses a piece of gear grants while equipped — a sparse map over the
  *  stat registry (only the stats this item rolled are present). */
 export type GearStats = Partial<Record<StatId, number>>;
@@ -77,6 +88,12 @@ export interface Hero {
   hpRegen: number;
   /** Derived bonus gold from kills, whole percent. */
   goldFind: number;
+  /** Current mana (spent on active abilities). */
+  mana: number;
+  /** Derived max mana (class base + per-level). */
+  maxMana: number;
+  /** Active ability ids unlocked by this hero's class + level. */
+  abilities: string[];
   gold: number;
   /** Deepest depth ever banked (via extract). Drives the idle income rate. */
   bestDepth: number;
