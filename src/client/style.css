@@ -448,6 +448,25 @@ body {
   cursor: pointer;
 }
 
+/* Death recap card (D34) — fills the top of the checkpoint panel on death;
+   hidden (empty) after an extract. Stays until the player picks a depth. */
+.death-recap {
+  display: none;
+  margin: 10px 0 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 84, 112, 0.45);
+  background: rgba(255, 84, 112, 0.12);
+  color: #ffb8c6;
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.death-recap.show {
+  display: block;
+}
+
 /* Item detail popup — mobile tap-to-inspect. Reuses .panel-backdrop for the
    dimmed overlay; the card is a compact, centered sheet. */
 .item-card {

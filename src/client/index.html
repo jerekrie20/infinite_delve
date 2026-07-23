@@ -51,10 +51,13 @@
           </div>
         </div>
       </div>
-      <!-- Checkpoint picker: after death or on first run, pick start depth (D4). -->
+      <!-- Checkpoint picker: after death or extract, pick start depth (D4).
+           On death it doubles as the recap card (D34): the recap block fills
+           and the panel stays until the player picks where to delve next. -->
       <div id="checkpoint-panel" class="panel-backdrop">
         <div class="panel">
-          <div class="panel-title">Choose Starting Depth</div>
+          <div id="checkpoint-title" class="panel-title">Choose Starting Depth</div>
+          <div id="checkpoint-recap" class="death-recap"></div>
           <div class="panel-day">Select a checkpoint to begin your next run</div>
           <div id="checkpoint-list" class="menu-list"></div>
         </div>

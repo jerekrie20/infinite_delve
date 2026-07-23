@@ -8,6 +8,7 @@ import { CombatEngine, type CombatEvent, type EngineSnapshot, type PackMemberVie
 import { STATUS_PRESETS } from '../../shared/combat/statuses';
 import { ACTIVES } from '../../shared/content/actives';
 import { seedFromString } from '../../shared/rng';
+import { bossForDepth } from '../../shared/content/monsters';
 import { postEquip, postRunResult, postSell } from '../api';
 import { enqueueRun, newRunId } from '../runQueue';
 import { loadRotationOrder, saveRotationOrder } from '../rotation';
@@ -94,6 +95,9 @@ export class LaneScene extends Phaser.Scene {
   private bankedGold = 0;
   private pendingIdle?: IdleGains;
   private over = false;
+  /** Set when an event floor's banner just showed — stretches the auto-
+   *  continue delay so the result is readable. */
+  private eventFloorShown = false;
 
   private heroSprite!: Phaser.GameObjects.Image;
   private actors = new Map<string, MonsterActor>();
@@ -168,9 +172,18 @@ export class LaneScene extends Phaser.Scene {
     this.buildChoiceUI();
     this.buildFleeButton();
 
-    // The engine buffered its first floorStart during construction — a zero-
-    // advance step drains it so the opening pack renders.
-    this.handleEvents(this.engine.step(0));
+    // Run-start checkpoint picker (D4): a hero with unlocked checkpoints
+    // chooses where the SESSION's first run starts too — not just after
+    // death/extract. The init-built engine is held and replaced on pick.
+    const checkpoints = this.hero.checkpoints ?? [1];
+    if (checkpoints.length > 1) {
+      this.over = true;
+      showCheckpointPicker(checkpoints, (depth) => this.resetRun(depth));
+    } else {
+      // The engine buffered its first floorStart during construction — a zero-
+      // advance step drains it so the opening pack renders.
+      this.handleEvents(this.engine.step(0));
+    }
     this.refreshHud();
 
     // "Welcome back" — offline idle gains auto-collected by the server.
@@ -222,6 +235,20 @@ export class LaneScene extends Phaser.Scene {
           if (bossActor) {
             this.floatNumber(bossActor.x, GROUND_Y - bossActor.spec.displayH - 70,
               `⚡ ${e.signatureName}`, '#ffb020');
+            // Telegraph flash (D31): the boss pulses red until the signature
+            // fires (one attack beat) — readable even if the float is missed.
+            if (!bossActor.dead) {
+              bossActor.sprite.setTint(0xff5470);
+              this.tweens.add({
+                targets: bossActor.sprite,
+                scaleX: bossActor.sprite.scaleX * 1.12,
+                scaleY: bossActor.sprite.scaleY * 1.12,
+                duration: 180, yoyo: true, repeat: 4, ease: 'Sine.inOut',
+                onComplete: () => {
+                  if (!bossActor.dead) bossActor.sprite.setTint(0xffb020);
+                },
+              });
+            }
           }
           break;
         }
@@ -234,21 +261,26 @@ export class LaneScene extends Phaser.Scene {
         case 'lootDrop': this.lootOrb(e.item); break;
         case 'eventEncounter': {
           const icons: Record<string, string> = { shrine: '🙏', altar: '🔥', cache: '📦', lore: '📜' };
-          const label = `${icons[e.eventType] ?? '✨'} ${e.eventType.toUpperCase()}: ${e.result ?? ''}`;
-          this.floatNumber(DESIGN_W / 2, GROUND_Y - 300, label, '#ffd84a');
+          // Events are a full banner + a longer pre-continue beat — the old
+          // 0.7s float vanished before anyone could read it (Phase 2 bug).
+          this.banner(`${icons[e.eventType] ?? '✨'} ${e.eventType.toUpperCase()}\n${e.result ?? ''}`, '#ffd84a', 1800);
+          this.eventFloorShown = true;
           break;
         }
         case 'floorCleared':
           // Choice pacing (D3/D33): pause only at every 5th depth
-          // (mini-boss/boss floors). Auto-continue between.
+          // (mini-boss/boss floors). Auto-continue between — with a longer
+          // hold after an event floor so its banner can be read.
           if (isPauseDepth(e.nextDepth)) {
             this.showChoice();
           } else {
-            this.time.delayedCall(400, () => this.doContinue());
+            const delay = this.eventFloorShown ? 2000 : 400;
+            this.eventFloorShown = false;
+            this.time.delayedCall(delay, () => this.doContinue());
           }
           break;
         case 'runEnded':
-          if (e.outcome === 'died') this.onDied(e.depthCleared);
+          if (e.outcome === 'died') void this.onDied(e.depthCleared);
           else void this.finishExtract(e.depthCleared, e.runGold, e.haul);
           break;
       }
@@ -292,7 +324,7 @@ export class LaneScene extends Phaser.Scene {
     if (boss) {
       const bannerLines = [`⚔ BOSS FLOOR ${this.engine.snapshot().depth} ⚔`, boss.name];
       if (boss.signatureName) bannerLines.push(`Watch for: ${boss.signatureName}`);
-      this.banner(bannerLines.join('\n'), '#ffb020');
+      this.banner(bannerLines.join('\n'), '#ffb020', 2200);
     }
   }
 
@@ -353,13 +385,14 @@ export class LaneScene extends Phaser.Scene {
       const syncNote = result.status === 'retryable' ? '\nrun saved — will sync' : '';
       this.banner(`EXTRACTED\n+${runGold}◆${gearLine}${syncNote}`, '#5bd06a');
     }
-    this.resetRun();
+    // After extract banner fades, show checkpoint picker (D4).
+    this.time.delayedCall(2000, () => this.pickCheckpointAndRestart());
     // Meta loop: nudge the Daily panel; and the gear panel (power may have grown).
     this.sys.game.events.emit('run-resolved', { outcome: 'extracted', reached: cleared });
     this.sys.game.events.emit('hero-changed', this.hero);
   }
 
-  private onDied(reached: number): void {
+  private async onDied(reached: number): Promise<void> {
     this.over = true;
     const snap = this.engine.snapshot();
     const runGold = snap.runGold;
@@ -376,32 +409,47 @@ export class LaneScene extends Phaser.Scene {
       recapLines.push(`Lost: ${runGold > 0 ? `+${runGold}◆` : ''}${haulCount > 0 ? ` ${haulCount} gear` : ''}`);
     }
 
+    // Banner shows immediately for juice; the full recap CARD rides the
+    // checkpoint panel below (D34) so it can actually be read. Server sync
+    // happens during the display.
+    this.banner(recapLines.join('\n'), '#ff5470', 1600);
+
+    // Await the server response so this.hero.checkpoints is up-to-date before
+    // the checkpoint picker reads it (D4). On network failure the run is queued
+    // and checkpoints stay stale — the picker still appears with what we have.
     const runId = this.runId;
-    void postRunResult('died', reached, [], runId).then((result) => {
-      if (result.status === 'retryable') {
-        enqueueRun(localStorage, {
-          runId,
-          outcome: 'died',
-          depthReached: reached,
-          haul: [],
-          queuedAt: Date.now(),
-        });
-      }
-      this.sys.game.events.emit('run-resolved', { outcome: 'died', reached });
-    });
-    this.banner(recapLines.join('\n'), '#ff5470');
-    // After death recap fades, show checkpoint picker (D4).
-    this.time.delayedCall(2500, () => this.pickCheckpointAndRestart());
+    const result = await postRunResult('died', reached, [], runId);
+    if (result.status === 'ok') {
+      this.hero = result.resp.hero;
+      this.bankedGold = this.hero.gold;
+      this.sys.game.events.emit('hero-changed', this.hero);
+    } else if (result.status === 'retryable') {
+      enqueueRun(localStorage, {
+        runId,
+        outcome: 'died',
+        depthReached: reached,
+        haul: [],
+        queuedAt: Date.now(),
+      });
+    }
+    this.sys.game.events.emit('run-resolved', { outcome: 'died', reached });
+
+    // After the banner beat, show the checkpoint picker carrying the recap
+    // card — it stays until the player picks where to delve next.
+    this.time.delayedCall(2000, () => this.pickCheckpointAndRestart(recapLines));
   }
 
-  /** Show the checkpoint picker, then restart the run at the chosen depth (D4). */
-  private pickCheckpointAndRestart(): void {
+  /** Show the checkpoint picker, then restart the run at the chosen depth (D4).
+   *  With `recapLines` (death flow, D34) the picker ALWAYS shows — it carries
+   *  the recap card, which stays readable until the player picks. Without them
+   *  (extract flow) a single-checkpoint hero just restarts at depth 1. */
+  private pickCheckpointAndRestart(recapLines?: string[]): void {
     const checkpoints = this.hero.checkpoints ?? [1];
-    if (checkpoints.length <= 1) {
+    if (!recapLines && checkpoints.length <= 1) {
       this.resetRun(1);
       return;
     }
-    showCheckpointPicker(checkpoints, (depth) => this.resetRun(depth));
+    showCheckpointPicker(checkpoints, (depth) => this.resetRun(depth), recapLines);
   }
 
   private resetRun(startDepth = 1): void {
@@ -574,6 +622,12 @@ export class LaneScene extends Phaser.Scene {
   private doContinue(): void {
     this.hideChoice();
     const next = this.engine.snapshot().depth + 1;
+    // Boss rooms (D31): the next floor is a boss lair — enter through the
+    // door transition instead of the plain run-off.
+    if (bossForDepth(next)) {
+      this.bossDoorTransition(next);
+      return;
+    }
     this.floatNumber(DESIGN_W / 2, GROUND_Y - 120, `Depth ${next}`, '#4aa3ff');
     // Hero runs right off-screen, next pack runs in.
     this.tweens.add({
@@ -585,6 +639,45 @@ export class LaneScene extends Phaser.Scene {
           targets: this.heroSprite, x: HERO_X, duration: 400, ease: 'Quad.out',
         });
         this.refreshHud();
+      },
+    });
+  }
+
+  /** Boss-room door transition (D31): the lane darkens behind a closing door,
+   *  the lair title card shows, then the door opens on the boss floor. */
+  private bossDoorTransition(next: number): void {
+    const boss = bossForDepth(next);
+    const overlay = this.add
+      .rectangle(DESIGN_W / 2, DESIGN_H / 2, DESIGN_W, DESIGN_H, 0x000000, 1)
+      .setAlpha(0)
+      .setDepth(200);
+    const title = this.add
+      .text(DESIGN_W / 2, GROUND_Y - 240,
+        `🚪 DEPTH ${next} 🚪\n${boss ? `The lair of\n${boss.name}` : 'Boss lair'}`, {
+          fontFamily: 'Arial', fontSize: '54px', color: '#ffb020',
+          fontStyle: 'bold', align: 'center',
+        })
+      .setOrigin(0.5)
+      .setAlpha(0)
+      .setDepth(201);
+    // Hero runs right into the dark → title card → door opens on the boss.
+    this.tweens.add({
+      targets: this.heroSprite, x: DESIGN_W + 80, duration: 500, ease: 'Quad.in',
+    });
+    this.tweens.add({
+      targets: overlay, alpha: 0.85, duration: 500,
+      onComplete: () => {
+        this.tweens.add({ targets: title, alpha: 1, duration: 250 });
+        this.heroSprite.x = -80;
+        this.time.delayedCall(1100, () => {
+          this.handleEvents(this.engine.continueRun());
+          this.tweens.add({ targets: this.heroSprite, x: HERO_X, duration: 400, ease: 'Quad.out' });
+          this.tweens.add({
+            targets: [overlay, title], alpha: 0, duration: 450,
+            onComplete: () => { overlay.destroy(); title.destroy(); },
+          });
+          this.refreshHud();
+        });
       },
     });
   }
@@ -615,6 +708,9 @@ export class LaneScene extends Phaser.Scene {
     if (this.fleeButton) {
       this.fleeButton.setAlpha(this.snap.phase === 'choosing' ? 0.8 : 0.4);
     }
+    // Boss floor: surface the live boss's name/title under the depth text
+    // in the top bar (map detail first, boss title below).
+    const liveBoss = this.snap.monsters.find((m) => m.rarity === 'boss' && m.hp > 0);
     this.sys.game.events.emit('hud-changed', {
       depth: this.snap.depth,
       bankedGold: this.bankedGold,
@@ -625,6 +721,7 @@ export class LaneScene extends Phaser.Scene {
       hero: this.hero,
       cooldowns: this.snap.cooldowns,
       recentHits: this.snap.recentHits,
+      bossName: liveBoss?.name,
     });
   }
 
@@ -758,7 +855,9 @@ export class LaneScene extends Phaser.Scene {
     });
   }
 
-  private banner(text: string, color: string): void {
+  /** Center-lane announcement text. `holdMs` = how long it stays before the
+   *  fade (default 1s; boss/event/death moments hold longer). */
+  private banner(text: string, color: string, holdMs = 1000): void {
     const b = this.add
       .text(DESIGN_W / 2, GROUND_Y - 300, text, {
         fontFamily: 'Arial', fontSize: '58px', color, fontStyle: 'bold', align: 'center',
@@ -768,7 +867,7 @@ export class LaneScene extends Phaser.Scene {
       .setScale(0.7);
     this.tweens.add({ targets: b, scale: 1, duration: 200, ease: 'Back.out' });
     this.tweens.add({
-      targets: b, alpha: 0, y: b.y - 60, delay: 1000, duration: 500,
+      targets: b, alpha: 0, y: b.y - 60, delay: holdMs, duration: 500,
       onComplete: () => b.destroy(),
     });
   }
@@ -809,11 +908,25 @@ const BOSS_THEMES: Record<number, string> = {
 };
 
 /** Populate the #checkpoint-panel with a button per unlocked checkpoint, then
- *  show it. On tap, hide and call `callback(depth)`. */
-function showCheckpointPicker(checkpoints: number[], callback: (depth: number) => void): void {
+ *  show it. On tap, hide and call `callback(depth)`. `recapLines` (death flow,
+ *  D34) fills the recap card at the top and retitles the panel — the card
+ *  stays up until the player picks, so the recap is never missable. */
+function showCheckpointPicker(
+  checkpoints: number[],
+  callback: (depth: number) => void,
+  recapLines?: string[],
+): void {
   const panel = document.getElementById('checkpoint-panel');
   const list = document.getElementById('checkpoint-list');
   if (!panel || !list) { callback(1); return; }
+
+  const title = document.getElementById('checkpoint-title');
+  if (title) title.textContent = recapLines ? '☠ You Died' : 'Choose Starting Depth';
+  const recap = document.getElementById('checkpoint-recap');
+  if (recap) {
+    recap.textContent = recapLines ? recapLines.join('\n') : '';
+    recap.classList.toggle('show', Boolean(recapLines));
+  }
 
   list.innerHTML = '';
   for (const depth of checkpoints) {

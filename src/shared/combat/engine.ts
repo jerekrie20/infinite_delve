@@ -352,9 +352,13 @@ export class CombatEngine {
 
   // ---- public API ----------------------------------------------------------
 
-  /** Advance real time; returns the events produced by the fixed steps run. */
+  /** Advance real time; returns the events produced by the fixed steps run.
+   *  ALWAYS drains buffered events, even outside 'fighting' — construction can
+   *  buffer an event-floor resolution (phase lands on 'choosing' immediately),
+   *  and an event-driven renderer would otherwise never see it (the Phase 2
+   *  run-start hard lock: ~1-in-8 starts spun forever with no pack). */
   step(deltaMs: number): CombatEvent[] {
-    if (this.phase !== 'fighting') return [];
+    if (this.phase !== 'fighting') return this.drain();
     const steps = this.accumulator.advance(deltaMs);
     for (let i = 0; i < steps && this.phase === 'fighting'; i++) this.stepOnce();
     return this.drain();

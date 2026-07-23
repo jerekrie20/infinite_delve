@@ -6,8 +6,8 @@
 import { describe, check, assert, assertNear } from './helpers';
 import { packForDepth, rewardEV, bodyguardTemplateFor } from '../src/shared/waves';
 import { TEMPLATES } from '../src/shared/content/monsters';
-import { behavioralStats } from '../src/shared/combat/engine';
-import { runSim } from '../src/shared/sim/runSim';
+import { CombatEngine, behavioralStats } from '../src/shared/combat/engine';
+import { runSim, simHero } from '../src/shared/sim/runSim';
 import { TUNING } from '../src/shared/content/tuning';
 import { createRng, type Rng } from '../src/shared/rng';
 
@@ -162,6 +162,35 @@ await check('extract-at policy banks; push-until-death dies', () => {
   assert.equal(extracted.depthCleared, 2);
   const pushed = runSim({ seed: 8, level: 1 });
   assert.equal(pushed.outcome, 'died');
+});
+
+// ── Phase 2: event-floor run starts must reach the renderer (D42) ─────
+
+await check('REGRESSION: event floor at run start drains via step(0) — no hard lock', () => {
+  // ~1-in-8 run starts roll an event floor in the constructor; the engine
+  // lands on 'choosing' before the renderer's first step(0). The old step()
+  // returned [] outside 'fighting', so the buffered eventEncounter +
+  // floorCleared never reached LaneScene → no pack, no choice UI, run stuck
+  // forever (the Phase 2 "picked a checkpoint, nothing spawns" bug).
+  const { hero, derived } = simHero(10, {});
+  let eventStarts = 0;
+  for (let seed = 1; seed <= 400; seed++) {
+    for (const startDepth of [1, 11, 21]) {
+      const engine = new CombatEngine({
+        hero, derived, seed: seed * 7919 + startDepth, rotationOrder: [], startDepth,
+      });
+      const drained = engine.step(0);
+      assert.ok(drained.length > 0, `construction events lost (seed ${seed}, depth ${startDepth})`);
+      if (drained.some((e) => e.type === 'eventEncounter')) {
+        eventStarts++;
+        assert.ok(
+          drained.some((e) => e.type === 'floorCleared'),
+          'event start must also deliver floorCleared so the run can advance'
+        );
+      }
+    }
+  }
+  assert.ok(eventStarts > 0, 'no event-floor start found across 1200 constructions — D42 rate broken?');
 });
 
 // ── Phase 2: boss signature moves (D39) ───────────────────────────────

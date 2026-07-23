@@ -59,6 +59,30 @@ async function boot(): Promise<void> {
   // Debug handle (harmless) so the scene state can be inspected during dev.
   (window as unknown as { __game?: Phaser.Game }).__game = game;
 
+  // DOM overlays must fully swallow input. Phaser listens for pointerdown on
+  // the WINDOW as well as the canvas (inputWindowEvents default), so a tap on
+  // a panel row also pressed canvas buttons underneath it — e.g. selling a
+  // stash item hit the Continue zone. stopPropagation on the panels' 'click'
+  // handlers can't help: Phaser reacts to the earlier pointerdown. So while
+  // ANY overlay (.panel-backdrop: gear/menu/daily/base/checkpoint/item popup)
+  // is visible, the game's input manager is disabled outright. The observer
+  // catches every open/close path: class 'show' toggles, the checkpoint
+  // panel's style.display, and the lazily-created item popup node.
+  const syncOverlayGate = (): void => {
+    const anyOverlayOpen = Array.from(
+      document.querySelectorAll<HTMLElement>('.panel-backdrop')
+    ).some((el) => el.classList.contains('show') || el.style.display === 'flex');
+    game.input.enabled = !anyOverlayOpen;
+  };
+  const overlayObserver = new MutationObserver(syncOverlayGate);
+  overlayObserver.observe(document.body, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ['class', 'style'],
+  });
+  syncOverlayGate();
+
   const lane = (): LaneScene | undefined =>
     game.scene.getScene('LaneScene') as LaneScene | undefined;
 
