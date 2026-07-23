@@ -7,10 +7,10 @@
 import type { MonsterRarity } from './delve';
 import { TUNING } from './content/tuning';
 import {
-  TEMPLATES, templatesForDepth, bossForDepth, templateIntervalMs,
+  TEMPLATES, templatesForDepth, bossForDepth, isMiniBossDepth, templateIntervalMs,
   type MonsterKind, type MonsterTemplate,
 } from './content/monsters';
-import { rollMonsterPassives } from './content/passives';
+import { rollFromPool } from './content/passives';
 import type { GearStats } from './delve';
 import type { Rng } from './rng';
 
@@ -51,7 +51,9 @@ export interface WaveMonster {
 export type PackMember = WaveMonster;
 
 /** Build one scaled monster. `share` splits the floor budget across a pack
- *  (1 for solo spawns); defense is a percent and is never split. */
+ *  (1 for solo spawns); defense is a percent and is never split.
+ *  Compound scaling (FORMULAS): past compoundThreshold, stats multiply by
+ *  compoundExp^(d−threshold). Rewards use a gentler exponent. */
 function scaledMonster(
   d: number,
   tpl: MonsterTemplate,
@@ -63,22 +65,42 @@ function scaledMonster(
   const hpMult = rarity === 'elite' ? m.eliteHpMult : rarity === 'boss' ? m.bossHpMult : 1;
   const atkMult = rarity === 'elite' ? m.eliteAtkMult : rarity === 'boss' ? m.bossAtkMult : 1;
   const rewardMult = rarity === 'elite' ? m.eliteRewardMult : rarity === 'boss' ? m.bossRewardMult : 1;
+
+  // Compound factor: 1.0 below threshold, compoundExp^(d−threshold) past it.
+  const past = Math.max(0, d - m.compoundThreshold);
+  const compoundHp = Math.pow(m.compoundHpExp, past);
+  const compoundAtk = Math.pow(m.compoundAtkExp, past);
+  const compoundReward = Math.pow(m.compoundRewardExp, past);
+
+  // Mini-boss floors: one extra passive tier beyond elite (D6 elevated elite).
+  const passiveTiers = rarity === 'boss' ? 3
+    : rarity === 'elite' && isMiniBossDepth(d) ? 3
+    : rarity === 'elite' ? 2
+    : 0;
   const budget = rarity === 'normal' ? 0 : m.passiveBudgetBase + m.passiveBudgetPerDepth * d;
-  const passives = rollMonsterPassives(tpl.passivePool, rarity, budget, rng);
-  const name = rarity === 'elite' ? `Elite ${tpl.name}` : tpl.name;
+  const passives = passiveTiers > 0
+    ? rollFromPool(tpl.passivePool, passiveTiers,
+        rarity === 'boss' ? [2, 3] : [1, passiveTiers], budget, rng)
+    : {};
+
+  const name = rarity === 'elite' && isMiniBossDepth(d)
+    ? `Mini-boss ${tpl.name}`
+    : rarity === 'elite' ? `Elite ${tpl.name}`
+    : tpl.name;
+
   return {
     kind: tpl.kind,
-    hp: Math.max(1, Math.round((m.baseHp + m.hpPerDepth * d) * tpl.statMult * hpMult * share)),
-    attack: Math.max(1, Math.round((m.baseAttack + m.attackPerDepth * d) * tpl.statMult * atkMult * share)),
+    hp: Math.max(1, Math.round((m.baseHp + m.hpPerDepth * d) * tpl.statMult * hpMult * share * compoundHp)),
+    attack: Math.max(1, Math.round((m.baseAttack + m.attackPerDepth * d) * tpl.statMult * atkMult * share * compoundAtk)),
     defense: Math.round(tpl.baseStats.defense * tpl.statMult),
-    xp: Math.round((m.baseXp + m.xpPerDepth * d) * tpl.statMult * rewardMult * share),
-    gold: Math.round((m.baseGold + m.goldPerDepth * d) * tpl.statMult * rewardMult * share),
+    xp: Math.round((m.baseXp + m.xpPerDepth * d) * tpl.statMult * rewardMult * share * compoundReward),
+    gold: Math.round((m.baseGold + m.goldPerDepth * d) * tpl.statMult * rewardMult * share * compoundReward),
     templateId: tpl.id,
     name,
     rarity,
     sprite: tpl.sprite,
     passives,
-    row: tpl.kind === 'caster' ? 'back' : 'front',
+    row: tpl.kind === 'caster' || tpl.kind === 'support' ? 'back' : 'front',
     intervalMs: templateIntervalMs(tpl),
   };
 }
@@ -116,9 +138,10 @@ export function monsterForDepth(depth: number, rng: Rng): WaveMonster {
 
   const tpl = active[Math.floor(rng() * active.length)]!;
 
-  // Roll rarity from the shared curve (the EV reward math folds the SAME curve
-  // in analytically — they must never disagree).
-  const rarity: MonsterRarity = rng() < eliteChanceAtDepth(d) ? 'elite' : 'normal';
+  // Mini-boss floors force elevated elite; otherwise roll the shared curve.
+  const rarity: MonsterRarity = isMiniBossDepth(d)
+    ? 'elite'
+    : rng() < eliteChanceAtDepth(d) ? 'elite' : 'normal';
   return scaledMonster(d, tpl, rarity, 1, rng);
 }
 
@@ -134,8 +157,9 @@ function rollPackSize(kind: MonsterKind, rng: Rng): number {
 
 /** Spawn the full floor pack (D32): 1-3 members in front/back rows, splitting
  *  the floor budget with the pack bonus. Bosses spawn solo (adds are Phase 2).
- *  Every member rolls its own elite chance + passives from the seeded rng —
- *  draw order is part of run determinism, don't reorder calls. */
+ *  Mini-boss floors force elevated elite. Every member rolls its own elite
+ *  chance + passives from the seeded rng — draw order is part of run
+ *  determinism, don't reorder calls. */
 export function packForDepth(depth: number, rng: Rng): WaveMonster[] {
   const d = Math.max(1, Math.floor(depth));
 
@@ -148,13 +172,25 @@ export function packForDepth(depth: number, rng: Rng): WaveMonster[] {
     : active[Math.floor(rng() * active.length)]!;
 
   const bonus = TUNING.combat.packBonusPerExtra;
-  const rollRarity = (): MonsterRarity => (rng() < eliteChanceAtDepth(d) ? 'elite' : 'normal');
+  // Mini-boss floors: forced elevated elite. Otherwise roll normally.
+  const rollRarity = (): MonsterRarity =>
+    isMiniBossDepth(d) ? 'elite' : (rng() < eliteChanceAtDepth(d) ? 'elite' : 'normal');
 
   if (tpl.kind === 'caster') {
     const bodyguard = bodyguardTemplateFor(d);
     if (!bodyguard) return [scaledMonster(d, tpl, rollRarity(), 1, rng)];
     const share = (1 + bonus) / 2; // n = 2
-    // Front member first — targeting picks the first alive front-row entity.
+    return [
+      scaledMonster(d, bodyguard, rollRarity(), share, rng),
+      scaledMonster(d, tpl, rollRarity(), share, rng),
+    ];
+  }
+
+  if (tpl.kind === 'support') {
+    // Support: backline + 1 front bodyguard (same pattern as caster).
+    const bodyguard = bodyguardTemplateFor(d);
+    if (!bodyguard) return [scaledMonster(d, tpl, rollRarity(), 1, rng)];
+    const share = (1 + bonus) / 2;
     return [
       scaledMonster(d, bodyguard, rollRarity(), share, rng),
       scaledMonster(d, tpl, rollRarity(), share, rng),
@@ -191,7 +227,8 @@ function packEVStatMult(depth: number, tpl: MonsterTemplate): number {
       return tpl.statMult * (1 + (1 + b)) / 2; // n ∈ {1,2} at 50/50
     case 'swarm':
       return tpl.statMult * ((1 + b) + (1 + 2 * b)) / 2; // n ∈ {2,3} at 50/50
-    case 'caster': {
+    case 'caster':
+    case 'support': {
       const bodyguard = bodyguardTemplateFor(depth);
       if (!bodyguard) return tpl.statMult;
       return ((tpl.statMult + bodyguard.statMult) / 2) * (1 + b); // fixed pair
@@ -205,36 +242,45 @@ function packEVStatMult(depth: number, tpl: MonsterTemplate): number {
  *  of the active templates (spawn picks uniformly, so the mean IS the template
  *  EV) × the analytic elite fold (members roll elite independently, so the
  *  fold factors out). Boss floors mirror packForDepth's solo-boss branch
- *  exactly. Values are FRACTIONAL — callers sum then round once, so the EV
- *  stays exact across a run. */
+ *  exactly. Compound scaling applies to rewards past compoundThreshold.
+ *  Values are FRACTIONAL — callers sum then round once, so the EV stays exact
+ *  across a run. */
 export function rewardEV(depth: number): { gold: number; xp: number } {
   const m = TUNING.monster;
   const d = Math.max(1, Math.floor(depth));
   const linGold = m.baseGold + m.goldPerDepth * d;
   const linXp = m.baseXp + m.xpPerDepth * d;
+  // Compound factor for rewards (gentler than stats — FORMULAS 1.02^past).
+  const past = Math.max(0, d - m.compoundThreshold);
+  const compoundReward = Math.pow(m.compoundRewardExp, past);
 
   const boss = bossForDepth(d);
   if (boss) {
     // Matches the boss branch of packForDepth (solo, already deterministic).
     return {
-      gold: Math.round(linGold * boss.statMult * m.bossRewardMult),
-      xp: Math.round(linXp * boss.statMult * m.bossRewardMult),
+      gold: Math.round(linGold * boss.statMult * m.bossRewardMult * compoundReward),
+      xp: Math.round(linXp * boss.statMult * m.bossRewardMult * compoundReward),
     };
   }
 
   const active = templatesForDepth(d).filter((t) => !t.bossInterval);
   if (active.length === 0) {
-    // Same fallback as packForDepth: the deep template, solo, always 'normal'.
+    // Same fallback as packForDepth: the last template, solo, always 'normal'.
     const t = TEMPLATES[TEMPLATES.length - 1]!;
-    return { gold: linGold * t.statMult, xp: linXp * t.statMult };
+    return {
+      gold: linGold * t.statMult * compoundReward,
+      xp: linXp * t.statMult * compoundReward,
+    };
   }
 
   const meanPackedMult =
     active.reduce((sum, t) => sum + packEVStatMult(d, t), 0) / active.length;
-  const eliteFold = 1 + eliteChanceAtDepth(d) * (m.eliteRewardMult - 1);
+  // Mini-boss floors: forced elite — the EV fold uses 100% elite chance.
+  const eliteChance = isMiniBossDepth(d) ? 1 : eliteChanceAtDepth(d);
+  const eliteFold = 1 + eliteChance * (m.eliteRewardMult - 1);
   return {
-    gold: linGold * meanPackedMult * eliteFold,
-    xp: linXp * meanPackedMult * eliteFold,
+    gold: linGold * meanPackedMult * eliteFold * compoundReward,
+    xp: linXp * meanPackedMult * eliteFold * compoundReward,
   };
 }
 

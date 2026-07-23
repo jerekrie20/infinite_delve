@@ -42,6 +42,16 @@ export interface MonsterTuning {
   /** Budget for rolling passive stat values. */
   passiveBudgetBase: number;
   passiveBudgetPerDepth: number;
+  /** Compound scaling: depth past this threshold applies exponential growth ⚙. */
+  compoundThreshold: number;
+  /** HP compound exponent: hp *= compoundHpExp^max(0, d−threshold) (FORMULAS 1.035). */
+  compoundHpExp: number;
+  /** ATK compound exponent (FORMULAS 1.03). */
+  compoundAtkExp: number;
+  /** Gold/XP compound exponent (FORMULAS 1.02 — rewards grow slower than stats). */
+  compoundRewardExp: number;
+  /** Mini-boss extra passive tier beyond elite (D6: forced elevated elite). */
+  miniBossExtraPassiveTier: number;
 }
 
 export interface CombatTuning {
@@ -169,6 +179,13 @@ export const TUNING: Tuning = {
     bossRewardMult: 12.0,
     passiveBudgetBase: 4,
     passiveBudgetPerDepth: 0.3,
+    // Compound scaling past depth 30 (FORMULAS monster section)
+    compoundThreshold: 30,
+    compoundHpExp: 1.035,
+    compoundAtkExp: 1.03,
+    compoundRewardExp: 1.02,
+    // Mini-boss: one extra passive tier beyond elite
+    miniBossExtraPassiveTier: 1,
   },
   combat: {
     tickMs: 100,

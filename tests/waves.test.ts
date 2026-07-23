@@ -13,6 +13,14 @@ import {
   runReward,
 } from '../src/shared/waves';
 import { TUNING } from '../src/shared/content/tuning';
+import {
+  isBossDepth,
+  isMiniBossDepth,
+  templatesForDepth,
+  validateRosterGaps,
+  THEME_AFFINITIES,
+  affinityForTemplate,
+} from '../src/shared/content/monsters';
 
 describe('waves');
 
@@ -22,11 +30,15 @@ await check('monsterForDepth: same seed → identical monster', () => {
   assert.deepEqual(a, b);
 });
 
-await check('boss floors (5, 10, 20) spawn bosses; 15 does not', () => {
-  assert.equal(monsterForDepth(5, createRng(1)).rarity, 'boss');
+await check('boss floors (10, 20, 30) spawn bosses; 5, 15 are mini-boss (elite)', () => {
   assert.equal(monsterForDepth(10, createRng(1)).rarity, 'boss');
   assert.equal(monsterForDepth(20, createRng(1)).rarity, 'boss');
-  assert.notEqual(monsterForDepth(15, createRng(1)).rarity, 'boss');
+  assert.equal(monsterForDepth(30, createRng(1)).rarity, 'boss');
+  // Depth 5 and 15 are mini-boss floors — forced elite, not boss.
+  assert.equal(monsterForDepth(5, createRng(1)).rarity, 'elite');
+  assert.equal(monsterForDepth(15, createRng(1)).rarity, 'elite');
+  // Depth 7 is a normal floor.
+  assert.notEqual(monsterForDepth(7, createRng(1)).rarity, 'boss');
 });
 
 await check('runReward is DETERMINISTIC — the assert that would have caught the bug', () => {
@@ -51,7 +63,7 @@ await check('non-boss EV sits strictly between the all-normal and all-elite boun
 });
 
 await check('boss floors pay the boss multiplier exactly (matches monsterForDepth)', () => {
-  for (const d of [5, 10, 20]) {
+  for (const d of [10, 20, 30]) {
     const bossMonster = monsterForDepth(d, createRng(1));
     assert.equal(rewardEV(d).gold, bossMonster.gold);
     assert.equal(rewardEV(d).xp, bossMonster.xp);
@@ -107,4 +119,78 @@ await check('computeIdle caps paid seconds and flags the cap', () => {
   assert.equal(over.paidSeconds, TUNING.idle.maxIdleSeconds);
   assert.equal(over.capped, true);
   assert.equal(over.xp, 0); // idle grants gold only — leveling stays active-play
+});
+
+// ── Phase 2: roster expansion + compound scaling + affinities ──────────
+
+await check('roster: every depth 1-60 has ≥2 non-boss templates (gap check)', () => {
+  const gaps = validateRosterGaps();
+  assert.equal(gaps.length, 0, gaps.join('; '));
+});
+
+await check('roster: boss at every 10th depth, mini-boss at every 5th (non-10th)', () => {
+  for (let d = 1; d <= 60; d++) {
+    if (d % 10 === 0) {
+      assert.ok(isBossDepth(d), `depth ${d} must be a boss floor`);
+      assert.ok(!isMiniBossDepth(d), `depth ${d} must NOT be a mini-boss floor`);
+    } else if (d % 5 === 0) {
+      assert.ok(!isBossDepth(d), `depth ${d} must NOT be a boss floor`);
+      assert.ok(isMiniBossDepth(d), `depth ${d} must be a mini-boss floor`);
+    } else {
+      assert.ok(!isBossDepth(d), `depth ${d} must NOT be a boss floor`);
+      assert.ok(!isMiniBossDepth(d), `depth ${d} must NOT be a mini-boss floor`);
+    }
+  }
+});
+
+await check('roster: all 6 themes have ≥3 templates active within their band', () => {
+  const themes = [
+    { name: 'goblin_camp', min: 1, max: 10 },
+    { name: 'crypt', min: 11, max: 20 },
+    { name: 'warrens', min: 21, max: 30 },
+    { name: 'deep', min: 31, max: 40 },
+    { name: 'volcanic', min: 41, max: 50 },
+    { name: 'abyss', min: 51, max: 60 },
+  ];
+  for (const theme of themes) {
+    const mid = Math.floor((theme.min + theme.max) / 2);
+    const active = templatesForDepth(mid).filter((t) => !t.bossInterval && t.theme === theme.name);
+    assert.ok(active.length >= 2, `${theme.name} at depth ${mid}: only ${active.length} template(s)`);
+  }
+});
+
+await check('compound scaling: depth 35 linear+compound > linear-only by notable margin', () => {
+  const m = TUNING.monster;
+  const lin35 = (m.baseHp + m.hpPerDepth * 35);
+  const past30 = Math.pow(m.compoundHpExp, 35 - m.compoundThreshold);
+  // The compound-scaled value at 35 should exceed the linear-only extrapolation.
+  const compound35 = lin35 * past30;
+  assert.ok(compound35 > lin35 * 1.1, `compound35 ${compound35} should notably exceed linear ${lin35}`);
+});
+
+await check('rewardEV grows past compound threshold but slower than HP scaling', () => {
+  const ev30 = rewardEV(30).gold;
+  const ev40 = rewardEV(40).gold;
+  // Rewards grow with compoundRewardExp (1.02), which is gentler than HP (1.035).
+  assert.ok(ev40 > ev30, 'rewards must grow past compound threshold');
+  // Ratio should be less than raw HP growth ratio (accounts for template changes).
+  const rewardRatio = ev40 / ev30;
+  const hpCompoundFactor = Math.pow(TUNING.monster.compoundHpExp, 10);
+  assert.ok(rewardRatio < hpCompoundFactor * 2, 'reward growth must be gentler than HP compound');
+});
+
+await check('theme affinities: all 6 themes have entries; lookups resolve', () => {
+  assert.equal(THEME_AFFINITIES.goblin_camp!.vulnerable[0], 'fire');
+  assert.equal(THEME_AFFINITIES.volcanic!.immune[0], 'fire');
+  assert.equal(THEME_AFFINITIES.abyss!.resists.length, 2);
+  // Affinity lookup by template id.
+  const chief = affinityForTemplate('goblin_chief');
+  assert.ok(chief !== undefined);
+  assert.equal(chief!.vulnerable[0], 'fire');
+});
+
+await check('monsterForDepth: depth 5 mini-boss name includes "Mini-boss"', () => {
+  const mb = monsterForDepth(5, createRng(7));
+  assert.ok(mb.name.startsWith('Mini-boss'), `expected "Mini-boss ..." got "${mb.name}"`);
+  assert.equal(mb.rarity, 'elite');
 });

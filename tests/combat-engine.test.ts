@@ -37,7 +37,7 @@ await check('different seeds diverge', () => {
   assert.notDeepEqual(a.events, b.events);
 });
 
-await check('pack sizes follow kind rules; boss floors spawn solo', () => {
+await check('pack sizes follow kind rules; boss + mini-boss floors', () => {
   const rng = createRng(99);
   for (let i = 0; i < 200; i++) {
     const pack = packForDepth(3, rng); // goblin camp: grunt 1-2, brute solo
@@ -45,7 +45,11 @@ await check('pack sizes follow kind rules; boss floors spawn solo', () => {
     if (kind === 'grunt') assert.ok(pack.length >= 1 && pack.length <= 2);
     if (kind === 'brute') assert.equal(pack.length, 1);
   }
-  const bossPack = packForDepth(5, createRng(1)); // chieftain floor
+  // Depth 5 is a mini-boss floor (forced elite), not a boss.
+  const miniBossPack = packForDepth(5, createRng(1));
+  assert.equal(miniBossPack[0]!.rarity, 'elite');
+  // Depth 10 is a boss floor (Goblin Chieftain).
+  const bossPack = packForDepth(10, createRng(1));
   assert.equal(bossPack.length, 1);
   assert.equal(bossPack[0]!.rarity, 'boss');
 });
@@ -102,9 +106,10 @@ await check('rewardEV matches the empirical pack spawn mean (server = client)', 
 
 await check('rewardEV boss floors unchanged by the pack fold (solo)', () => {
   const m = TUNING.monster;
-  const linGold = m.baseGold + m.goldPerDepth * 5;
+  const linGold = m.baseGold + m.goldPerDepth * 10;
   const chief = TEMPLATES.find((t) => t.id === 'goblin_chief')!;
-  assertNear(rewardEV(5).gold, Math.round(linGold * chief.statMult * m.bossRewardMult));
+  const expected = Math.round(linGold * chief.statMult * m.bossRewardMult);
+  assertNear(rewardEV(10).gold, expected);
 });
 
 await check('revive lives on onLethal ONLY — the probe cannot re-fire dodge/block', () => {

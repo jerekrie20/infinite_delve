@@ -95,7 +95,10 @@ export interface Hero {
 /** Behavioral archetype of a monster template (drives combat flavor + drop
  *  rules, e.g. swarms drop more). Canonical here; re-exported by
  *  content/monsters.ts and waves.ts. */
-export type MonsterKind = 'grunt' | 'swarm' | 'brute' | 'caster';
+export type MonsterKind = 'grunt' | 'swarm' | 'brute' | 'caster' | 'support';
+
+/** Element tags for statuses and theme affinities (D38). */
+export type ElementTag = 'fire' | 'ice' | 'lightning' | 'dark' | 'nature' | 'physical';
 
 // ---- Endpoint contracts ---------------------------------------------------
 

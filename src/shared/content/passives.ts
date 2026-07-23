@@ -60,6 +60,32 @@ export const PASSIVE_POOLS: Record<string, PassivePool> = {
     },
   },
 
+  // ── Monster themes 31-60 (Phase 2 roster expansion) ───────────────
+  deep: {
+    id: 'deep',
+    tiers: {
+      tier1: ['dodgeChance'],
+      tier2: ['lifestealPct', 'slowOnHitPct'],
+      tier3: ['executeThreshold', 'statusResist'],
+    },
+  },
+  volcanic: {
+    id: 'volcanic',
+    tiers: {
+      tier1: ['thornsPct'],
+      tier2: ['burnChance', 'counterAttackPct'],
+      tier3: ['explodeOnKill', 'doubleStrikeChance'],
+    },
+  },
+  abyss: {
+    id: 'abyss',
+    tiers: {
+      tier1: ['statusResist', 'hpRegen'],
+      tier2: ['startingShield', 'slowOnHitPct'],
+      tier3: ['reviveChance', 'executeThreshold'],
+    },
+  },
+
   // ── Player class innate passives ───────────────────────────────────
   // (staged — rolls when the class system gains passive support)
   squire: {
