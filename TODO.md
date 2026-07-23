@@ -117,30 +117,30 @@ renderer of `CombatEvent`s; sim + tests run the same code).
       Part B; registry now 46 stats). Tests: 102 asserts incl. the
       same-seed-twice determinism law
 
-## 🟡 Phase 2 — Run restructure + world (D3-D6)
+## 🟡 Phase 2 — Run restructure + world (D3-D6) ✅ COMPLETE 2026-07-22
 
-- [ ] **Checkpoints** — felling boss at depth 10/20/30… unlocks it; run-start
+- [x] **Checkpoints** — felling boss at depth 10/20/30… unlocks it; run-start
       checkpoint picker UI (after-death flow too)
-- [ ] **Choice pacing** — pause only at every 5th depth (mini-boss/boss floors);
+- [x] **Choice pacing** — pause only at every 5th depth (mini-boss/boss floors);
       auto-continue between; flee button works between fights only (D33)
-- [ ] **Smart protected auto-equip** (D33) — never displaces set/unique/manual
+- [x] **Smart protected auto-equip** (D33) — never displaces set/unique/manual
       picks without a swap prompt on the extract summary; toggleable
-- [ ] **Depth map** — boss every 10th + mini-boss every 5th, endless; extend
+- [x] **Depth map** — boss every 10th + mini-boss every 5th, endless; extend
       roster past depth 29 (currently boss-free!); theme scaffolding to ~60;
       pack composition per kind (roster.md)
-- [ ] **Boss rooms** (D31) — door transition, name banner, signature
+- [x] **Boss rooms** (D31) — door transition, name banner, signature
       wind-up telegraphs; rotation-capable/manual-advantage tuning
-- [ ] **Death recap card** + elite/boss passive badges at spawn (D34-D35)
-- [ ] **Scaling curve rework** — mild compounding past ~30 so walls exist
-- [ ] **Balance sandbox tool** (TUNING sliders + live sim readout) — then the
+- [x] **Death recap card** + elite/boss passive badges at spawn (D34-D35)
+- [x] **Scaling curve rework** — mild compounding past ~30 so walls exist
+- [x] **Balance sandbox tool** (TUNING sliders + live sim readout) — then the
       **balance pass**: boss HP (270 @ d5 is 10× too spiky), normals not
       one-shot, checkpoint-start reward pacing
 - [ ] Monster editor tool (optional, data rows are workable by hand)
 
-- [ ] **Event floors** (D42) — shrine/altar/cache/lore at ~1-in-8; seeded;
+- [x] **Event floors** (D42) — shrine/altar/cache/lore at ~1-in-8; seeded;
       auto-resolve rules for rotation/offline
-- [ ] **Loot as light** (D41) — rarity-glow orbs + fly-to-bag collection
-- [ ] **Support monsters + theme affinities** (D38/D40) — kill-order packs,
+- [x] **Loot as light** (D41) — rarity-glow orbs + fly-to-bag collection
+- [x] **Support monsters + theme affinities** (D38/D40) — kill-order packs,
       ±25% status potency per theme
 
 ## 🟢 Phase 3 — Classes & onboarding (D12-D13)
