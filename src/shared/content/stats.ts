@@ -59,6 +59,13 @@ export type StatId =
   | 'explodeOnKill'
   | 'hpRegen'
   | 'hpRegenPct'
+  // ── Combat clock (structural — read by the attack timer) ───────
+  | 'attackSpeedPct'
+  // ── Status appliers (behavioral — apply catalog statuses) ──────
+  | 'burnChance'
+  | 'bleedChance'
+  | 'slowOnHitPct'
+  | 'shockChance'
   // ── Utility (behavioral) ───────────────────────────────────────
   | 'goldFindPct'
   | 'xpBonusPct'
@@ -93,7 +100,20 @@ export type DerivedId =
   | 'reviveChance'
   | 'critHeal'
   | 'explodeOnKill'
-  | 'blockChance';
+  | 'blockChance'
+  // Combat v2 (Phase 1): clock read + status framework stats
+  | 'attackSpeedPct'
+  | 'poisonChance'
+  | 'poisonDamage'
+  | 'cleavePct'
+  | 'statusResist'
+  | 'shieldLeechPct'
+  | 'startingShield'
+  | 'preemptiveStrike'
+  | 'burnChance'
+  | 'bleedChance'
+  | 'slowOnHitPct'
+  | 'shockChance';
 
 export const DERIVED_IDS: DerivedId[] = [
   'attack', 'maxHp', 'defensePct',
@@ -105,15 +125,23 @@ export const DERIVED_IDS: DerivedId[] = [
   'doubleStrikeChance', 'executeThreshold', 'armorPierce',
   'counterAttackPct', 'reviveChance', 'critHeal', 'explodeOnKill',
   'blockChance',
+  'attackSpeedPct',
+  'poisonChance', 'poisonDamage', 'cleavePct', 'statusResist',
+  'shieldLeechPct', 'startingShield', 'preemptiveStrike',
+  'burnChance', 'bleedChance', 'slowOnHitPct', 'shockChance',
 ];
 
-/** Named combat hook points. A behavioral stat declares which one fires it. */
+/** Named combat hook points. A behavioral stat declares which one fires it.
+ *  `onLethal` fires ONLY when a hit would kill its owner (revive lives there —
+ *  probing revive via onTakeDamage re-fired dodge/block/thorns, the Phase 1
+ *  audit bug). */
 export type HookPoint =
   | 'onCombatStart'
   | 'onAttack'
   | 'onCrit'
   | 'onDealDamage'
   | 'onTakeDamage'
+  | 'onLethal'
   | 'onKill'
   | 'perTick';
 
@@ -136,7 +164,8 @@ export interface StatDef {
   handler?: string;
 }
 
-/** The full catalog — 41 stats. Order = display order in gear panel / tooltips. */
+/** The full catalog — 46 stats (41 + the Phase 1 combat-v2 five: attackSpeedPct
+ *  + burn/bleed/slow/shock appliers). Order = display order in gear panel. */
 export const STATS: Record<StatId, StatDef> = {
   // ═══════════════════════════════════════════════════════════════════
   // Core flat/pct (always live — the generic fold handles them)
@@ -217,9 +246,8 @@ export const STATS: Record<StatId, StatDef> = {
   },
   cleavePct: {
     id: 'cleavePct', name: 'Cleave', abbr: 'CLV', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.3, value: 5,
+    target: 'cleavePct', op: 'flat', perBudget: 0.3, value: 5,
     kind: 'behavioral', max: 40, hook: 'onDealDamage', handler: 'cleaveAoE',
-    implemented: false,
   },
   executeThreshold: {
     id: 'executeThreshold', name: 'Execute', abbr: 'EXEC', pct: true,
@@ -228,15 +256,15 @@ export const STATS: Record<StatId, StatDef> = {
   },
   poisonChance: {
     id: 'poisonChance', name: 'Poison Chance', abbr: 'PSN', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.2, value: 6,
+    target: 'poisonChance', op: 'flat', perBudget: 0.2, value: 6,
     kind: 'behavioral', max: 30, hook: 'onAttack', handler: 'applyPoison',
-    implemented: false,
   },
+  // Structural read, not a hook dispatch: the Poison status magnitude calc
+  // reads the derived total (+X% more poison damage) — stats-catalog Part A.
   poisonDamage: {
     id: 'poisonDamage', name: 'Poison Dmg', abbr: 'PSN', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.4, value: 4,
-    kind: 'behavioral', max: 50, hook: 'onAttack', handler: 'applyPoison',
-    implemented: false,
+    target: 'poisonDamage', op: 'flat', perBudget: 0.4, value: 4,
+    kind: 'flat', max: 50,
   },
   armorPierce: {
     id: 'armorPierce', name: 'Armor Pierce', abbr: 'PIERCE', pct: true,
@@ -292,19 +320,19 @@ export const STATS: Record<StatId, StatDef> = {
   reviveChance: {
     id: 'reviveChance', name: 'Revive', abbr: 'REV', pct: true,
     target: 'reviveChance', op: 'flat', perBudget: 0.08, value: 12,
-    kind: 'behavioral', max: 10, hook: 'onTakeDamage', handler: 'reviveRoll',
+    kind: 'behavioral', max: 10, hook: 'onLethal', handler: 'reviveRoll',
   },
   shieldLeechPct: {
     id: 'shieldLeechPct', name: 'Shield Leech', abbr: 'SHLD', pct: true,
-    target: 'maxHp', op: 'flat', perBudget: 0.2, value: 6,
+    target: 'shieldLeechPct', op: 'flat', perBudget: 0.2, value: 6,
     kind: 'behavioral', max: 30, hook: 'onDealDamage', handler: 'shieldLeech',
-    implemented: false,
   },
+  // Structural read: the status framework rolls resist itself on every
+  // application (status-effects.md resist model) — no hook dispatch.
   statusResist: {
-    id: 'statusResist', name: 'Status Resist', abbr: 'RES',
-    target: 'attack', op: 'flat', perBudget: 0.3, value: 4, kind: 'behavioral',
-    max: 40, hook: 'onTakeDamage', handler: 'statusResistRoll',
-    implemented: false,
+    id: 'statusResist', name: 'Status Resist', abbr: 'RES', pct: true,
+    target: 'statusResist', op: 'flat', perBudget: 0.3, value: 4,
+    kind: 'flat', max: 40,
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -363,15 +391,46 @@ export const STATS: Record<StatId, StatDef> = {
   // ═══════════════════════════════════════════════════════════════════
   startingShield: {
     id: 'startingShield', name: 'Start Shield', abbr: 'SHLD', pct: true,
-    target: 'maxHp', op: 'flat', perBudget: 0.25, value: 6,
+    target: 'startingShield', op: 'flat', perBudget: 0.25, value: 6,
     kind: 'behavioral', max: 30, hook: 'onCombatStart', handler: 'grantShield',
-    implemented: false,
   },
   preemptiveStrike: {
     id: 'preemptiveStrike', name: 'Preemptive', abbr: 'PRE', pct: true,
-    target: 'attack', op: 'flat', perBudget: 0.25, value: 7,
+    target: 'preemptiveStrike', op: 'flat', perBudget: 0.25, value: 7,
     kind: 'behavioral', max: 30, hook: 'onCombatStart', handler: 'preStrike',
-    implemented: false,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Combat clock (structural — the attack timer reads the derived total)
+  // ═══════════════════════════════════════════════════════════════════
+  attackSpeedPct: {
+    id: 'attackSpeedPct', name: 'Attack Speed', abbr: 'AS', pct: true,
+    target: 'attackSpeedPct', op: 'flat', perBudget: 0.25, band: [3, 8],
+    value: 5, kind: 'flat', max: 50,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Status appliers (behavioral — Phase 1 status framework)
+  // ═══════════════════════════════════════════════════════════════════
+  burnChance: {
+    id: 'burnChance', name: 'Burn Chance', abbr: 'BURN', pct: true,
+    target: 'burnChance', op: 'flat', perBudget: 0.2, band: [4, 10], value: 6,
+    kind: 'behavioral', max: 35, hook: 'onDealDamage', handler: 'applyBurn',
+  },
+  bleedChance: {
+    id: 'bleedChance', name: 'Bleed Chance', abbr: 'BLD', pct: true,
+    target: 'bleedChance', op: 'flat', perBudget: 0.25, band: [6, 14], value: 7,
+    kind: 'behavioral', max: 50, hook: 'onCrit', handler: 'applyBleed',
+  },
+  slowOnHitPct: {
+    id: 'slowOnHitPct', name: 'Slow on Hit', abbr: 'SLOW', pct: true,
+    target: 'slowOnHitPct', op: 'flat', perBudget: 0.2, band: [4, 10], value: 6,
+    kind: 'behavioral', max: 30, hook: 'onDealDamage', handler: 'applySlow',
+  },
+  shockChance: {
+    id: 'shockChance', name: 'Shock Chance', abbr: 'SHK', pct: true,
+    target: 'shockChance', op: 'flat', perBudget: 0.2, band: [4, 10], value: 6,
+    kind: 'behavioral', max: 35, hook: 'onDealDamage', handler: 'applyShock',
   },
 };
 

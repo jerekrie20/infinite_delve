@@ -1,27 +1,50 @@
-// Active ABILITY registry — data-driven skill definitions shared by client and
-// server. Same pattern as stats.ts: one row = one ability. Adding a new skill
-// ("Fireball", "Backstab") is one row here + an icon in the HUD.
+// Active ABILITY registry — data-driven skill definitions shared by client,
+// engine, and server. Same pattern as stats.ts: one row = one ability; the
+// class-kits catalog (game_design/mechanics/01-classes/class-kits.md) is the
+// design source for every number here.
 //
-// Each ability belongs to a class and unlocks at a specific level. The hero's
-// `abilities` array holds the ids they've unlocked. LaneScene dispatches casts
-// during the hero's attack window — mana is deducted, cooldown starts, damage
-// (or a special effect) fires.
+// D30 shape: slot 1 is the BASIC ATTACK (basic: true — no mana, no cooldown,
+// fires on the attack-speed timer); slots 2-5 are mana abilities fired by the
+// rotation (shared/combat/rotation.ts) or manual taps. Statuses an ability
+// applies are preset references (shared/combat/statuses.ts) — never bespoke
+// buff logic here.
+
+import type { StatusId, ModQuantity } from '../combat/statuses';
 
 // ---- Ability definition -------------------------------------------------------
+
+/** Who a hit lands on within the enemy pack (D32) — never tap-targeting. */
+export type Targeting = 'front' | 'all' | 'back' | 'random';
+
+export interface AbilityStatus {
+  id: StatusId;
+  /** Applied to 'target' (the hit enemy/enemies) or 'self' (hero buffs). */
+  side: 'target' | 'self';
+  /** Override the preset's default magnitude (signed for mods). */
+  magnitude?: number;
+  durationMs?: number;
+  /** statMod only: the quantity the ad-hoc modifier shifts. */
+  modTarget?: ModQuantity;
+}
 
 export interface ActiveDef {
   id: string;
   name: string;
   /** Emoji icon shown on the skill button (until real art lands). */
   icon: string;
+  /** Which of the 5 loadout slots this ability belongs to (D24). */
+  slot: number;
+  /** Slot-1 attack style: no mana, no cooldown, fires on the attack timer. */
+  basic?: boolean;
   manaCost: number;
-  /** Cooldown in ms. */
+  /** Cooldown in ms (0 for basics). */
   cooldownMs: number;
-  /** Multiplier on the hero's ATK for damage-dealing abilities (>1 = harder hit). */
+  /** Multiplier on the hero's ATK for damage-dealing abilities/styles. */
   damageMult?: number;
-  /** Special effect handler name (future: 'fortify', 'heal', etc.). If set,
-   *  LaneScene calls the named handler instead of applying damageMult. */
-  handler?: string;
+  /** Where the damage lands in the pack (default 'front'). */
+  targeting?: Targeting;
+  /** Statuses this ability applies when it resolves. */
+  statuses?: AbilityStatus[];
   /** Flavor / tooltip shown on long-press. */
   description: string;
 }
@@ -34,25 +57,29 @@ export interface AbilityUnlock {
   level: number;
 }
 
-// ---- The registry -------------------------------------------------------------
+// ---- The registry (Squire option-1 column; more rows land with Phase 3) -------
 
 export const ACTIVES: Record<string, ActiveDef> = {
   slam: {
     id: 'slam',
     name: 'Slam',
     icon: '💥',
-    manaCost: 15,
-    cooldownMs: 8000,
-    damageMult: 1.8,
-    description: 'A heavy overhead strike dealing 180% weapon damage.',
+    slot: 1,
+    basic: true,
+    manaCost: 0,
+    cooldownMs: 0,
+    damageMult: 1.15,
+    targeting: 'front',
+    description: 'Your attack style: a heavy overhead strike dealing 115% weapon damage.',
   },
   fortify: {
     id: 'fortify',
     name: 'Fortify',
     icon: '🛡️',
+    slot: 2,
     manaCost: 25,
     cooldownMs: 20000,
-    handler: 'fortify',
+    statuses: [{ id: 'fortify', side: 'self', magnitude: -50, durationMs: 3000 }],
     description: 'Raise your guard, reducing all incoming damage by 50% for 3 seconds.',
   },
 };
@@ -71,35 +98,3 @@ export function unlockedAbilities(classId: string, level: number): string[] {
   if (!list) return [];
   return list.filter((u) => level >= u.level).map((u) => u.abilityId);
 }
-
-// ---- Active buff tracking (for non-damage abilities like Fortify) -------------
-
-export interface ActiveBuff {
-  abilityId: string;
-  /** Time remaining in ms. */
-  remainingMs: number;
-}
-
-// ---- Special effect handlers (called by LaneScene when ability.handler is set) -
-
-export type ActiveHandlerFn = (
-  hero: { attack: number; maxHp: number; hp: number; defense: number },
-  buffs: ActiveBuff[],
-) => { damageDealt?: number; buffApplied?: ActiveBuff; healAmount?: number };
-
-/** Fortify: apply a 50% damage reduction buff for 3 seconds. */
-function applyFortify(
-  _hero: { attack: number; maxHp: number; hp: number; defense: number },
-  buffs: ActiveBuff[],
-): { buffApplied: ActiveBuff } {
-  // Remove existing fortify buff if present, then apply fresh.
-  const idx = buffs.findIndex((b) => b.abilityId === 'fortify');
-  if (idx >= 0) buffs.splice(idx, 1);
-  const buff: ActiveBuff = { abilityId: 'fortify', remainingMs: 3000 };
-  buffs.push(buff);
-  return { buffApplied: buff };
-}
-
-export const ACTIVE_HANDLERS: Record<string, ActiveHandlerFn> = {
-  fortify: applyFortify,
-};

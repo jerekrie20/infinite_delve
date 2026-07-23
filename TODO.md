@@ -76,26 +76,46 @@ they live. All are contained changes.
 
 ## 🟠 Phase 1 — Combat framework v2 (D14, D30-D32) — unblocks nearly everything
 
-- [ ] **Per-entity attack timers on a 100ms clock** — kill the global 2s
-      exchange tick; interval is a class/template stat; `attackSpeedPct` live;
-      damage variance → ±5% (D35)
-- [ ] **Rotation system** (D30) — slot 1 = basic attack (no mana); slots 2-5
-      fire by player-ordered priority (skip-if-unaffordable); manual taps
-      interleave; rotation-order editor UI
-- [ ] **Packs** (D32) — 1-3 enemies, front/back rows, ability targeting types
-      (front/all/back/random), floor-budget reward split (FORMULAS)
-- [ ] **Status-effect framework** — unified 16 statuses incl. generic StatMod
-      ([[status-effects]]): stun/DoT/debuff/buff/shield/Shock; element tags
-      (D38); 1s tick; HUD icons
-- [ ] Replace hard-coded Fortify check in LaneScene with a status
-- [ ] **Sim CLI v2** (TOOLING #2) — headless seeded runs of combat v2; the
-      test harness and the future server sim both ride on it
-- [ ] **Seeded combat end-to-end** — thread `Rng` through LaneScene (damage,
-      drops, spawns). Prereq for Daily Delve, offline sim, server verification
-- [ ] Cleanup while in there: `dispatchHook` mutate-and-return split; revive
-      probe no longer re-fires unrelated `onTakeDamage` handlers
-- [ ] Flip cheap staged stats live once statuses exist (poison, cleave-as-
-      adjacent-hit, burn/bleed/slow appliers)
+Built 2026-07-22: the loop extracted into `src/shared/combat/` (clock /
+statuses / rotation / engine — bible §1.4: ONE engine; LaneScene is now a
+renderer of `CombatEvent`s; sim + tests run the same code).
+
+- [x] **Per-entity attack timers on a 100ms clock** — global 2s exchange tick
+      dead; interval is a class stat (`ClassDef.attackIntervalMs`) / per-kind
+      monster content (`KIND_INTERVAL_MS`, roster.md ⚙); `attackSpeedPct`
+      live (cap +50, floor 1.0s); damage variance → ±5% (D35). Fixed-step
+      `StepAccumulator` quantizes frame deltas — replay is frame-rate-proof
+- [x] **Rotation system** (D30) — slot 1 = basic attack (Slam rebalanced to
+      the class-kits 115% no-mana style); slots 2-5 by player-ordered
+      priority (skip-if-unaffordable → basic); manual taps queue to the beat
+      (D33) and win; priority badges + ▲-promote editor in the HUD skills
+      tab; order persists client-local (`delve:rotation:v1` — DATA_SCHEMA)
+- [x] **Packs** (D32) — `packForDepth`: 1-3 enemies by kind rules (roster ⚙),
+      front/back rows, `Targeting` on abilities (front/all/back/random),
+      floor-budget split ×(1+0.15(n−1)) ⚙; `rewardEV` folds the pack EV
+      analytically so server payouts still match client spawns
+- [x] **Status-effect framework** — all 16 statuses as preset rows over
+      generic machinery (DoT tick · signed StatMod read-at-use · Shield pool
+      · stun gate) incl. element tags (D38), resist model, boss stun
+      halving, 8-cap, cleanse rules; 1s tick; HUD emoji icon row (real 24px
+      icons ride the art phase-1/2 pass)
+- [x] Hard-coded Fortify check replaced — Fortify is status row #11;
+      `ActiveBuff`/`ACTIVE_HANDLERS` deleted
+- [x] **Sim CLI v2** (TOOLING #2) — `shared/sim/runSim.ts` (headless seeded
+      policy runs on THE engine) + `tools/combat-sim.ts` thin CLI; the v1
+      duplicated loop is dead
+- [x] **Seeded combat end-to-end** — engine seeds from `seedFromString(runId)`
+      (replay-ready for Phase 7); damage/drops/spawns all draw the run rng;
+      `Math.random` defaults REMOVED from waves/items (rng now required);
+      client keeps live-random only for cosmetics + id fallbacks
+- [x] Cleanup: `dispatchHook` → pure `collectHook` (engine applies results
+      centrally); revive moved to a new `onLethal` hook — the probe can no
+      longer re-fire dodge/block/thorns
+- [x] Staged stats flipped live: poison duo, cleave (true adjacent-hit),
+      statusResist, shield pair (startingShield/shieldLeech), preemptive;
+      NEW burn/bleed/slow/shock appliers + `attackSpeedPct` (stats-catalog
+      Part B; registry now 46 stats). Tests: 102 asserts incl. the
+      same-seed-twice determinism law
 
 ## 🟡 Phase 2 — Run restructure + world (D3-D6)
 

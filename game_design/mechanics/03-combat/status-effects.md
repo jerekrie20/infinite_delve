@@ -1,6 +1,8 @@
 ---
 tags: [catalog, combat]
-status: planned
+status: built-v1 (Phase 1 2026-07-22 — src/shared/combat/statuses.ts holds
+  all 16 presets; sources for Mark/Curse/Undying etc. arrive with their
+  Phase 2/3 content; theme-affinity potency wiring is Phase 2)
 depends-on: [combat]
 ---
 

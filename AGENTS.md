@@ -28,7 +28,7 @@ TypeScript game layer.
 
 - **No builds in dev**: never run `npm run build` / `devvit` CLI /
   `vite build` unprompted. Validate with `npm run type-check`,
-  `npm run lint`, `npx tsx tests/<file>` (there is NO `npm run test` yet)
+  `npm run lint`, `npm run test` (tsx-run asserts in `tests/`)
 - Devvit web only — never use `@devvit/public-api` or "blocks" code
 - Client: `navigateTo` not `window.location`; `showToast`/`showForm` not
   `alert`; no inline script tags in HTML

@@ -25,17 +25,6 @@ export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
 export type MonsterRarity = 'normal' | 'elite' | 'boss';
 
-/** One combat exchange for the summary tab. */
-export interface CombatTurn {
-  depth: number;
-  heroAction: string;
-  heroDmg: number;
-  heroCrit: boolean;
-  monsterAction: string;
-  monsterDmg: number;
-  monsterCrit: boolean;
-}
-
 /** Stat bonuses a piece of gear grants while equipped — a sparse map over the
  *  stat registry (only the stats this item rolled are present). */
 export type GearStats = Partial<Record<StatId, number>>;

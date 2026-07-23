@@ -64,6 +64,8 @@ async function boot(): Promise<void> {
     openBase: () => document.getElementById('base-panel')?.classList.add('show'),
     openMenu: () => document.getElementById('menu-panel')?.classList.add('show'),
     cast: (abilityId: string) => lane()?.castAbility(abilityId),
+    getRotation: () => lane()?.getRotationOrder() ?? [],
+    setRotation: (order: string[]) => lane()?.setRotationOrder(order),
   };
   game.scene.add('HudScene', HudScene, true, { hooks, hero });
 

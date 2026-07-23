@@ -6,18 +6,23 @@
 
 import type { MonsterRarity } from './delve';
 import { TUNING } from './content/tuning';
-import { TEMPLATES, templatesForDepth, bossForDepth, type MonsterKind } from './content/monsters';
+import {
+  TEMPLATES, templatesForDepth, bossForDepth, templateIntervalMs,
+  type MonsterKind, type MonsterTemplate,
+} from './content/monsters';
 import { rollMonsterPassives } from './content/passives';
 import type { GearStats } from './delve';
 import type { Rng } from './rng';
 
 export type { MonsterKind };
 
-/** RNG source: a 0..1 random function (Math.random at runtime; seeded in tests). */
+/** RNG source: a 0..1 random function — REQUIRED everywhere (Phase 1 seeded
+ *  combat: the engine passes the run's seeded rng; there is no live-random
+ *  default left in gameplay paths). */
 export type { Rng };
 
-/** The single monster you face at a given depth (one monster per depth = your
- *  progress marker). Stats scale with depth + rarity; passive behaviors are
+/** One spawned monster (a pack member). Stats scale with depth + rarity and
+ *  are split by the pack share (FORMULAS floor budget); passive behaviors are
  *  rolled at spawn from the template's pool. */
 export interface WaveMonster {
   kind: MonsterKind;
@@ -34,52 +39,79 @@ export interface WaveMonster {
   rarity: MonsterRarity;
   /** Client texture key. */
   sprite: string;
-  /** Rolled passive stats — fed directly to behavioralStats() in LaneScene. */
+  /** Rolled passive stats — fed to the engine's behavioralStats(). */
   passives: GearStats;
+  /** Pack row (D32): melee front, ranged/casters back. */
+  row: 'front' | 'back';
+  /** Base attack interval in ms (kind default or template override). */
+  intervalMs: number;
 }
 
-export function monsterForDepth(depth: number, rng: Rng = Math.random): WaveMonster {
-  const d = Math.max(1, Math.floor(depth));
+/** Engine-facing alias: what packForDepth emits. */
+export type PackMember = WaveMonster;
+
+/** Build one scaled monster. `share` splits the floor budget across a pack
+ *  (1 for solo spawns); defense is a percent and is never split. */
+function scaledMonster(
+  d: number,
+  tpl: MonsterTemplate,
+  rarity: MonsterRarity,
+  share: number,
+  rng: Rng,
+): WaveMonster {
   const m = TUNING.monster;
+  const hpMult = rarity === 'elite' ? m.eliteHpMult : rarity === 'boss' ? m.bossHpMult : 1;
+  const atkMult = rarity === 'elite' ? m.eliteAtkMult : rarity === 'boss' ? m.bossAtkMult : 1;
+  const rewardMult = rarity === 'elite' ? m.eliteRewardMult : rarity === 'boss' ? m.bossRewardMult : 1;
+  const budget = rarity === 'normal' ? 0 : m.passiveBudgetBase + m.passiveBudgetPerDepth * d;
+  const passives = rollMonsterPassives(tpl.passivePool, rarity, budget, rng);
+  const name = rarity === 'elite' ? `Elite ${tpl.name}` : tpl.name;
+  return {
+    kind: tpl.kind,
+    hp: Math.max(1, Math.round((m.baseHp + m.hpPerDepth * d) * tpl.statMult * hpMult * share)),
+    attack: Math.max(1, Math.round((m.baseAttack + m.attackPerDepth * d) * tpl.statMult * atkMult * share)),
+    defense: Math.round(tpl.baseStats.defense * tpl.statMult),
+    xp: Math.round((m.baseXp + m.xpPerDepth * d) * tpl.statMult * rewardMult * share),
+    gold: Math.round((m.baseGold + m.goldPerDepth * d) * tpl.statMult * rewardMult * share),
+    templateId: tpl.id,
+    name,
+    rarity,
+    sprite: tpl.sprite,
+    passives,
+    row: tpl.kind === 'caster' ? 'back' : 'front',
+    intervalMs: templateIntervalMs(tpl),
+  };
+}
+
+/** The deep-depth fallback template (shouldn't fire with the roster's open-
+ *  ended deep band, but every depth must resolve to something). */
+function fallbackTemplate(): MonsterTemplate {
+  return TEMPLATES[TEMPLATES.length - 1]!;
+}
+
+/** The bodyguard a caster spawn fronts with: the FIRST eligible grunt/brute
+ *  template at this depth, in registry order (deterministic — the reward-EV
+ *  fold and the live spawn must agree on this pick). */
+export function bodyguardTemplateFor(depth: number): MonsterTemplate | undefined {
+  return templatesForDepth(depth).find(
+    (t) => !t.bossInterval && (t.kind === 'grunt' || t.kind === 'brute')
+  );
+}
+
+export function monsterForDepth(depth: number, rng: Rng): WaveMonster {
+  const d = Math.max(1, Math.floor(depth));
 
   // Boss floor check.
   const boss = bossForDepth(d);
-  if (boss) {
-    const budget = m.passiveBudgetBase + m.passiveBudgetPerDepth * d;
-    const passives = rollMonsterPassives(boss.passivePool, 'boss', budget, rng);
-    return {
-      kind: boss.kind,
-      hp: Math.round((m.baseHp + m.hpPerDepth * d) * boss.statMult * m.bossHpMult),
-      attack: Math.round((m.baseAttack + m.attackPerDepth * d) * boss.statMult * m.bossAtkMult),
-      defense: Math.round(boss.baseStats.defense * boss.statMult),
-      xp: Math.round((m.baseXp + m.xpPerDepth * d) * boss.statMult * m.bossRewardMult),
-      gold: Math.round((m.baseGold + m.goldPerDepth * d) * boss.statMult * m.bossRewardMult),
-      templateId: boss.id,
-      name: boss.name,
-      rarity: 'boss',
-      sprite: boss.sprite,
-      passives,
-    };
-  }
+  if (boss) return scaledMonster(d, boss, 'boss', 1, rng);
 
   // Normal/elite: pick a random template active at this depth.
   const active = templatesForDepth(d).filter((t) => !t.bossInterval);
   if (active.length === 0) {
-    // Fallback — shouldn't happen with the deep template (depthMin 30, no max).
-    const t = TEMPLATES[TEMPLATES.length - 1]!;
-    return {
-      kind: t.kind,
-      hp: Math.round((m.baseHp + m.hpPerDepth * d) * t.statMult),
-      attack: Math.round((m.baseAttack + m.attackPerDepth * d) * t.statMult),
-      defense: Math.round(t.baseStats.defense * t.statMult),
-      xp: Math.round((m.baseXp + m.xpPerDepth * d) * t.statMult),
-      gold: Math.round((m.baseGold + m.goldPerDepth * d) * t.statMult),
-      templateId: t.id,
-      name: t.name,
-      rarity: 'normal',
-      sprite: t.sprite,
-      passives: {},
-    };
+    const t = fallbackTemplate();
+    // Fallback keeps the legacy passive-free normal spawn.
+    const solo = scaledMonster(d, t, 'normal', 1, rng);
+    return { ...solo, passives: {} };
   }
 
   const tpl = active[Math.floor(rng() * active.length)]!;
@@ -87,29 +119,53 @@ export function monsterForDepth(depth: number, rng: Rng = Math.random): WaveMons
   // Roll rarity from the shared curve (the EV reward math folds the SAME curve
   // in analytically — they must never disagree).
   const rarity: MonsterRarity = rng() < eliteChanceAtDepth(d) ? 'elite' : 'normal';
+  return scaledMonster(d, tpl, rarity, 1, rng);
+}
 
-  const hpMult = rarity === 'elite' ? m.eliteHpMult : 1;
-  const atkMult = rarity === 'elite' ? m.eliteAtkMult : 1;
-  const rewardMult = rarity === 'elite' ? m.eliteRewardMult : 1;
+/** Per-kind pack sizes (roster.md pack-composition ⚙): returns the member
+ *  count for a picked template's kind. Caster size is decided by bodyguard
+ *  availability, handled in packForDepth. */
+function rollPackSize(kind: MonsterKind, rng: Rng): number {
+  if (kind === 'brute') return 1;
+  if (kind === 'grunt') return rng() < 0.5 ? 1 : 2;
+  if (kind === 'swarm') return rng() < 0.5 ? 2 : 3;
+  return 1; // caster — resolved by the caller
+}
 
-  const budget = rarity === 'elite' ? m.passiveBudgetBase + m.passiveBudgetPerDepth * d : 0;
-  const passives = rollMonsterPassives(tpl.passivePool, rarity, budget, rng);
+/** Spawn the full floor pack (D32): 1-3 members in front/back rows, splitting
+ *  the floor budget with the pack bonus. Bosses spawn solo (adds are Phase 2).
+ *  Every member rolls its own elite chance + passives from the seeded rng —
+ *  draw order is part of run determinism, don't reorder calls. */
+export function packForDepth(depth: number, rng: Rng): WaveMonster[] {
+  const d = Math.max(1, Math.floor(depth));
 
-  const name = rarity === 'elite' ? `Elite ${tpl.name}` : tpl.name;
+  const boss = bossForDepth(d);
+  if (boss) return [scaledMonster(d, boss, 'boss', 1, rng)];
 
-  return {
-    kind: tpl.kind,
-    hp: Math.round((m.baseHp + m.hpPerDepth * d) * tpl.statMult * hpMult),
-    attack: Math.round((m.baseAttack + m.attackPerDepth * d) * tpl.statMult * atkMult),
-    defense: Math.round(tpl.baseStats.defense * tpl.statMult),
-    xp: Math.round((m.baseXp + m.xpPerDepth * d) * tpl.statMult * rewardMult),
-    gold: Math.round((m.baseGold + m.goldPerDepth * d) * tpl.statMult * rewardMult),
-    templateId: tpl.id,
-    name,
-    rarity,
-    sprite: tpl.sprite,
-    passives,
-  };
+  const active = templatesForDepth(d).filter((t) => !t.bossInterval);
+  const tpl = active.length === 0
+    ? fallbackTemplate()
+    : active[Math.floor(rng() * active.length)]!;
+
+  const bonus = TUNING.combat.packBonusPerExtra;
+  const rollRarity = (): MonsterRarity => (rng() < eliteChanceAtDepth(d) ? 'elite' : 'normal');
+
+  if (tpl.kind === 'caster') {
+    const bodyguard = bodyguardTemplateFor(d);
+    if (!bodyguard) return [scaledMonster(d, tpl, rollRarity(), 1, rng)];
+    const share = (1 + bonus) / 2; // n = 2
+    // Front member first — targeting picks the first alive front-row entity.
+    return [
+      scaledMonster(d, bodyguard, rollRarity(), share, rng),
+      scaledMonster(d, tpl, rollRarity(), share, rng),
+    ];
+  }
+
+  const n = rollPackSize(tpl.kind, rng);
+  const share = (1 + bonus * (n - 1)) / n;
+  const pack: WaveMonster[] = [];
+  for (let i = 0; i < n; i++) pack.push(scaledMonster(d, tpl, rollRarity(), share, rng));
+  return pack;
 }
 
 /** Elite chance at a depth — ONE curve shared by the live spawn roll and the
@@ -121,12 +177,36 @@ export function eliteChanceAtDepth(depth: number): number {
   return Math.min(m.eliteChance + m.eliteChancePerDepth * d, m.eliteChanceCap);
 }
 
+/** Expected floor-total multiplier for one template pick: the pack-EV fold
+ *  (FORMULAS): E[Σ member statMult × share] over the kind's pack-size
+ *  distribution. Grunt E[1+b(n−1)] over {1,2}; swarm over {2,3}; caster with a
+ *  bodyguard is a fixed pair whose statMults average. MUST mirror packForDepth
+ *  exactly — spawn texture and server payouts share this shape. */
+function packEVStatMult(depth: number, tpl: MonsterTemplate): number {
+  const b = TUNING.combat.packBonusPerExtra;
+  switch (tpl.kind) {
+    case 'brute':
+      return tpl.statMult;
+    case 'grunt':
+      return tpl.statMult * (1 + (1 + b)) / 2; // n ∈ {1,2} at 50/50
+    case 'swarm':
+      return tpl.statMult * ((1 + b) + (1 + 2 * b)) / 2; // n ∈ {2,3} at 50/50
+    case 'caster': {
+      const bodyguard = bodyguardTemplateFor(depth);
+      if (!bodyguard) return tpl.statMult;
+      return ((tpl.statMult + bodyguard.statMult) / 2) * (1 + b); // fixed pair
+    }
+  }
+}
+
 /** EXPECTED reward for clearing one depth — fully deterministic (FORMULAS
- *  "Reward EV rule"): no template pick, no elite roll. Non-boss depths use the
- *  linear ramp × mean statMult of the active templates (spawn picks uniformly,
- *  so the mean IS the template EV) × the analytic elite fold. Boss floors
- *  mirror monsterForDepth's boss branch exactly. Values are FRACTIONAL —
- *  callers sum then round once, so the EV stays exact across a run. */
+ *  "Reward EV rule" + pack-EV fold): no template pick, no elite roll, no pack
+ *  roll. Non-boss depths use the linear ramp × the mean pack-folded statMult
+ *  of the active templates (spawn picks uniformly, so the mean IS the template
+ *  EV) × the analytic elite fold (members roll elite independently, so the
+ *  fold factors out). Boss floors mirror packForDepth's solo-boss branch
+ *  exactly. Values are FRACTIONAL — callers sum then round once, so the EV
+ *  stays exact across a run. */
 export function rewardEV(depth: number): { gold: number; xp: number } {
   const m = TUNING.monster;
   const d = Math.max(1, Math.floor(depth));
@@ -135,7 +215,7 @@ export function rewardEV(depth: number): { gold: number; xp: number } {
 
   const boss = bossForDepth(d);
   if (boss) {
-    // Matches the boss branch of monsterForDepth (already deterministic).
+    // Matches the boss branch of packForDepth (solo, already deterministic).
     return {
       gold: Math.round(linGold * boss.statMult * m.bossRewardMult),
       xp: Math.round(linXp * boss.statMult * m.bossRewardMult),
@@ -144,16 +224,17 @@ export function rewardEV(depth: number): { gold: number; xp: number } {
 
   const active = templatesForDepth(d).filter((t) => !t.bossInterval);
   if (active.length === 0) {
-    // Same fallback as monsterForDepth: the deep template, always 'normal'.
+    // Same fallback as packForDepth: the deep template, solo, always 'normal'.
     const t = TEMPLATES[TEMPLATES.length - 1]!;
     return { gold: linGold * t.statMult, xp: linXp * t.statMult };
   }
 
-  const meanStatMult = active.reduce((sum, t) => sum + t.statMult, 0) / active.length;
+  const meanPackedMult =
+    active.reduce((sum, t) => sum + packEVStatMult(d, t), 0) / active.length;
   const eliteFold = 1 + eliteChanceAtDepth(d) * (m.eliteRewardMult - 1);
   return {
-    gold: linGold * meanStatMult * eliteFold,
-    xp: linXp * meanStatMult * eliteFold,
+    gold: linGold * meanPackedMult * eliteFold,
+    xp: linXp * meanPackedMult * eliteFold,
   };
 }
 

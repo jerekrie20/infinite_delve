@@ -16,6 +16,9 @@ export interface ClassDef {
   baseAttack: number;
   /** Attack gained per level. */
   attackPerLevel: number;
+  /** Base attack interval in ms (class-kits table: Squire 2.0s · Archer 1.5s ·
+   *  Apprentice 3.0s). Effective interval = this ÷ (1 + attackSpeedPct/100). */
+  attackIntervalMs: number;
   /** Client texture key for this class's sprite. */
   sprite: string;
 }
@@ -28,6 +31,7 @@ export const CLASSES: Record<HeroClass, ClassDef> = {
     hpPerLevel: 8,
     baseAttack: 6,
     attackPerLevel: 1,
+    attackIntervalMs: 2000,
     sprite: 'hero',
   },
 };

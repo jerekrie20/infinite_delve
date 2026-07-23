@@ -45,17 +45,37 @@ export interface MonsterTuning {
 }
 
 export interface CombatTuning {
-  /** Ms between auto-attack exchanges. */
-  attackIntervalMs: number;
+  /** Fixed combat-clock step in ms (FORMULAS "Combat clock", D32). */
+  tickMs: number;
+  /** Hard cap on total attackSpeedPct (FORMULAS: +50 ⚙). */
+  attackSpeedCapPct: number;
+  /** Absolute floor on any effective attack interval (FORMULAS: 1.0s). */
+  minAttackIntervalMs: number;
+  /** Extra pack budget per enemy beyond the first (FORMULAS floor budget:
+   *  total = floorBudget × (1 + this × (n−1))). */
+  packBonusPerExtra: number;
   /** Base crit probability, 0..1, before gear's critChance% stat adds on top. */
   critChance: number;
   /** Crit damage multiplier. */
   critMultiplier: number;
-  /** Damage jitter, ± this fraction (0.1 = ±10%). */
+  /** Damage jitter, ± this fraction (0.05 = ±5%, D35). */
   damageVariance: number;
   /** Fraction of maxHp the hero heals after each kill — lets runs breathe so
    *  the wall is a deep soft cap, not an instant depth-3 death. */
   healOnKillPct: number;
+}
+
+export interface StatusTuning {
+  /** Statuses tick (DoT, regen, duration) on this sub-clock, ms. */
+  tickMs: number;
+  /** Max active statuses per side; applications beyond it are dropped. */
+  capPerSide: number;
+  /** Shield pool ceiling as a fraction of owner maxHp (0.5 = 50%). */
+  shieldCapPctMaxHp: number;
+  /** Bosses' innate resist vs STUN only, whole percent. */
+  bossStunResistPct: number;
+  /** Each successful stun within this window halves the next stun's duration. */
+  stunHalvingWindowMs: number;
 }
 
 export interface IdleTuning {
@@ -109,6 +129,7 @@ export interface Tuning {
   hero: HeroTuning;
   monster: MonsterTuning;
   combat: CombatTuning;
+  statuses: StatusTuning;
   idle: IdleTuning;
   items: ItemTuning;
   plausibility: PlausibilityTuning;
@@ -150,11 +171,21 @@ export const TUNING: Tuning = {
     passiveBudgetPerDepth: 0.3,
   },
   combat: {
-    attackIntervalMs: 2000,
+    tickMs: 100,
+    attackSpeedCapPct: 50,
+    minAttackIntervalMs: 1000,
+    packBonusPerExtra: 0.15,
     critChance: 0.05,
     critMultiplier: 1.5,
-    damageVariance: 0.1,
+    damageVariance: 0.05,
     healOnKillPct: 0.45,
+  },
+  statuses: {
+    tickMs: 1000,
+    capPerSide: 8,
+    shieldCapPctMaxHp: 0.5,
+    bossStunResistPct: 40,
+    stunHalvingWindowMs: 10000,
   },
   idle: {
     maxIdleSeconds: 8 * 60 * 60,

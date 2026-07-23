@@ -41,15 +41,25 @@ For depth d, with base linear ramp `lin(d) = base + perDepth × min(d, 30)`:
 - **Elite chance**: `5% + 0.1%/depth, cap 40%`; **mini-boss floors (every
   5th, non-boss)**: forced elite + one extra passive tier
 - **Floor budget (D32)**: a depth's hp/atk/reward values above define ONE
-  floor total. A pack of n enemies splits it: each gets
-  `budget × packShare(n) / n` where `packShare = 1 / 1.15^0 …` i.e. total
-  pack budget = `floorBudget × (1 + 0.15×(n−1))` ⚙ (packs slightly harder
-  AND slightly richer, never n×). Composition by kind: brute = solo ·
-  grunts = 1-2 · swarm = 2-3 · caster = backline + 1 bodyguard · boss =
-  solo or +1 add
+  floor total. A pack of n enemies splits it: total pack budget =
+  `floorBudget × (1 + packBonus×(n−1))` with `packBonus = 0.15` ⚙ (TUNING
+  `packBonusPerExtra`; packs slightly harder AND slightly richer, never
+  n×), each enemy getting an equal 1/n share. Composition + pack-size
+  distribution by kind: brute = solo · grunts = 1-2 (50/50 ⚙) · swarm =
+  2-3 (50/50 ⚙) · caster = backline + 1 bodyguard · boss = solo or +1 add
+  ([[roster]] table is normative)
+- **Pack-EV fold (extends the Reward EV rule below)**: reward EV per depth
+  multiplies by `meanPackMult(d) = E[1 + packBonus×(n−1)]`, the expected
+  pack bonus over the depth's active templates (template pick uniform →
+  its kind's size distribution: brute/caster-solo n=1 · grunt E[n]=1.5 ·
+  swarm E[n]=2.5 · caster-with-bodyguard n=2). Analytic, never a live
+  roll — client spawns and server payouts share the same fold
 - **Combat clock (D32)**: 100ms global tick; each entity attacks every
-  `interval ÷ (1 + attackSpeedPct/100)`; statuses tick on the 1s sub-clock.
-  Damage variance **±5%** (D35)
+  `interval ÷ (1 + attackSpeedPct/100)`, attackSpeedPct hard cap +50 ⚙,
+  interval floor 1.0s absolute; statuses tick on the 1s sub-clock. Hero
+  interval is the class stat ([[class-kits]]); monster intervals are
+  per-kind content values in [[roster]] (content, not a curve). Damage
+  variance **±5%** (D35)
 - **Manual-advantage target (D31)**: rotation-only clears at-level content;
   manual boss play yields ~20-30% better outcomes ⚙ (measured in the sim
   as time-to-kill + damage-taken deltas)

@@ -47,7 +47,7 @@ stats apply, and [[gear-catalog]] for which bases roll what.
 | armorPierce | onAttack / ignoreDefense | **live** | |
 | manaLeechPct | onDealDamage / manaPercent | **fix + stage→live** | placeholder target `lifestealPct` → new derived `manaLeechPct`. Restores mana = X% of damage dealt. Needs live mana in combat loop (exists client-side) |
 | poisonChance | onAttack / applyPoison | **fix + stage→live** | placeholder target `attack` → new derived `poisonChance`. Applies **Poison** status ([[status-effects]]) |
-| poisonDamage | onAttack / applyPoison | **fix + stage→live** | → derived `poisonDamage`; scales the Poison status magnitude |
+| poisonDamage | — (structural read) | **fix + stage→live** | → derived `poisonDamage`; the Poison magnitude calc reads it at apply time (same structural-read pattern as attackSpeedPct) — no hook dispatch |
 | cleavePct | onDealDamage / cleaveAoE | **fix + stage→live** | packs exist now (D32) — TRUE adjacent-hit: X% of damage also hits the next enemy in the row. Target → derived `cleavePct` |
 | critDamageBurst | onCrit / splashAoE | **retire (revisit)** | kept retired for launch; candidate revival as an epic "crits splash the row" affix once pack combat proves fun (D32 note in [[combat]]) |
 | accuracy | (none) | **retire** | no miss system; dodge already owns avoidance |
@@ -63,9 +63,9 @@ stats apply, and [[gear-catalog]] for which bases roll what.
 | blockHeal | onTakeDamage / onBlockHeal | **stage→live** | heal X% maxHp on successful block; target → derived `blockHeal` |
 | counterAttackPct | onTakeDamage / counterAttack | **live** | |
 | critHeal | onCrit / critHealEffect | **live** | |
-| reviveChance | onTakeDamage / reviveRoll | **live** | once per fight |
+| reviveChance | **onLethal** / reviveRoll | **live** (hook moved) | once per fight; fires only when a hit would be lethal. Was `onTakeDamage` — probing it there re-fired dodge/block/thorns handlers (Phase 1 engine fix) |
 | shieldLeechPct | onDealDamage / shieldLeech | **fix + stage→live** | needs **Shield** status; gain shield = X% of damage dealt. Target → derived `shieldLeechPct` |
-| statusResist | onTakeDamage / statusResistRoll | **fix + stage→live** | placeholder target `attack` → derived `statusResist`. Semantics: X% chance to fully resist any incoming status application ([[status-effects]] resist model) |
+| statusResist | — (structural read) | **fix + stage→live** | placeholder target `attack` → derived `statusResist`. Semantics: X% chance to fully resist any incoming status application — the status framework rolls it at apply time ([[status-effects]] resist model), no hook dispatch; `statusResistRoll` handler retired |
 | healOnKillPct | onKill / healOnKill | **live** | |
 | explodeOnKill | onKill / explodeAoE | **live** (monster-side) | |
 | hpRegen | perTick / regenFlat | **live** | |

@@ -18,6 +18,18 @@ export const createRng = (seed: number): Rng => {
   };
 };
 
+/** Deterministic 32-bit seed from a string (FNV-1a). One canonical seed per
+ *  runId: the client seeds its engine with it, and (Phase 7) the server can
+ *  re-derive the same seed from the reported runId for replay verification. */
+export const seedFromString = (s: string): number => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+};
+
 export const randInt = (rng: Rng, minIncl: number, maxExcl: number): number =>
   minIncl + Math.floor(rng() * (maxExcl - minIncl));
 

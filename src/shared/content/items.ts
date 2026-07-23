@@ -26,7 +26,7 @@ const SET_ITEM_BY_ID: Record<string, SetItemDef> = Object.fromEntries(
   ALL_SET_ITEMS.map((e) => [e.item.id, e.item])
 );
 
-/** A 0..1 random source (defaults to Math.random; tests pass a seeded one). */
+/** A 0..1 random source — REQUIRED (the engine injects the run seed). */
 export type { Rng };
 
 interface RarityTier {
@@ -216,7 +216,7 @@ function maybeRollUnique(depth: number, rng: Rng): GearItem | null {
  *  otherwise a depth-weighted rarity. Then primary (full budget) + rarity-many
  *  affixes (flat affixes scale with depth, pct affixes roll a fixed band). Seeded,
  *  server-authoritative. Not-yet-implemented stats are skipped by the roller. */
-export function rollGear(depth: number, rng: Rng = Math.random): GearItem {
+export function rollGear(depth: number, rng: Rng): GearItem {
   const d = Math.max(1, Math.floor(depth));
   const unique = maybeRollUnique(d, rng);
   if (unique) return unique;
@@ -266,7 +266,7 @@ export function rollGear(depth: number, rng: Rng = Math.random): GearItem {
 }
 
 /** Roll a possible drop for one kill; null if nothing dropped. */
-export function rollDrop(depth: number, isSwarm: boolean, rng: Rng = Math.random): GearItem | null {
+export function rollDrop(depth: number, isSwarm: boolean, rng: Rng): GearItem | null {
   const chance = TUNING.items.dropChance * (isSwarm ? TUNING.items.swarmDropMult : 1);
   if (rng() > chance) return null;
   return rollGear(depth, rng);

@@ -68,6 +68,7 @@ interface StoredClass {
   xp: number;
   stage: number;                   // 0 base / 1 promoted / 2 final
   loadout: Record<number, string>; // slot(1-5) → chosen abilityId (D24)
+  rotation: number[];              // slots 2-5 in priority order (D30); Phase 1 keeps this client-local (below)
   optionsUnlocked: string[];       // ability ids beyond defaults
   equipped: Partial<Record<GearSlot, GearItem>>; // per-class paper-doll
 }
@@ -87,6 +88,13 @@ read, as today). Mana is never stored (resets between runs, as today).
 Depth, run haul, run gold, statuses, cooldowns, mana, monster state — all
 client/sim-local. The server sees runs only via `run/result` (and produces
 them itself for expeditions).
+
+## Client-local (localStorage, not server state)
+
+| Key | Content | Migrates to |
+|-----|---------|-------------|
+| `delve:pending-runs:v1` | failed run-result retry queue (Phase 0) | never — device-scoped by design |
+| `delve:rotation:v1` | rotation priority order, slots 2-5 (D30) | `StoredClass.rotation` when the v3 StoredAccount migration lands (Phase 2+) |
 
 ## Meta keys (per-installation = per-subreddit; current pattern kept)
 

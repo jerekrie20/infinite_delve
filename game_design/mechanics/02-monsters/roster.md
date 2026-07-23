@@ -16,14 +16,20 @@ ids. Numbers are baseStats before depth scaling — **sandbox-tunable v1**.
 Floors spawn 1-3 enemies in front/back rows from the depth's active
 templates, splitting the floor budget ([[FORMULAS]]):
 
-| Kind | Composition | Row |
-|------|-------------|-----|
-| brute | always solo | front |
-| grunt | solo or pair | front |
-| swarm | pack of 2-3 | front (small silhouettes) |
-| caster | backline + 1 front bodyguard (grunt/brute) | back |
-| **support** (D40) | backline; heals/buffs its pack on a cast timer (existing handlers: regen, Rage, Shield) | back |
-| boss | solo, or +1 add at the sandbox's discretion | front (adds per kind) |
+| Kind | Composition (pack size ⚙) | Row | Attack interval ⚙ |
+|------|--------------------------|-----|-------------------|
+| brute | always solo | front | **2.6s** |
+| grunt | solo or pair (50/50) | front | **2.0s** |
+| swarm | pack of 2-3 (50/50) | front (small silhouettes) | **1.4s** |
+| caster | backline + 1 front bodyguard (front-most eligible grunt/brute template at that depth; solo if none) | back | **3.2s** |
+| **support** (D40) | backline; heals/buffs its pack on a cast timer (existing handlers: regen, Rage, Shield) | back | 3.2s (cast timer) |
+| boss | solo, or +1 add at the sandbox's discretion (adds are Phase 2) | front (adds per kind) | kind's interval |
+
+Attack intervals are per-KIND defaults ⚙ (a template may override with its
+own `intervalMs`); per-entity timers run on the 100ms combat clock
+([[FORMULAS]] "Combat clock"): actual interval =
+`intervalMs ÷ (1 + attackSpeedPct/100)`. Pack-size rolls draw from the
+run's seeded Rng.
 
 Ranged/caster/support enemies attack (or heal) from the back row on their
 own timers; the hero reaches them via `back`-targeting abilities or by

@@ -1,6 +1,7 @@
 ---
 tags: [mechanic]
-status: in-progress
+status: built-v1 (Phase 1 2026-07-22 — engine in src/shared/combat/; boss
+  rooms/signatures + support monsters + affinity potency are Phase 2)
 depends-on: [core-run, monsters]
 ---
 

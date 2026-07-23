@@ -12,6 +12,21 @@ import type { MonsterKind } from '../delve';
 
 export type { MonsterKind };
 
+/** Per-kind base attack intervals ⚙ (roster.md pack-composition table is
+ *  normative). A template may override with its own `intervalMs`; bosses use
+ *  their kind's interval. Effective = interval ÷ (1 + attackSpeedPct/100). */
+export const KIND_INTERVAL_MS: Record<MonsterKind, number> = {
+  grunt: 2000,
+  swarm: 1400,
+  brute: 2600,
+  caster: 3200,
+};
+
+/** Attack interval for a template: its override, else its kind's default. */
+export function templateIntervalMs(t: MonsterTemplate): number {
+  return t.intervalMs ?? KIND_INTERVAL_MS[t.kind];
+}
+
 export interface MonsterTemplate {
   id: string;
   name: string;
@@ -34,6 +49,8 @@ export interface MonsterTemplate {
   bossOf?: string;
   /** Boss spawns every N depths (must be set when bossOf is set). */
   bossInterval?: number;
+  /** Attack interval override in ms (default: KIND_INTERVAL_MS[kind]). */
+  intervalMs?: number;
 }
 
 // ---- The roster ---------------------------------------------------------------

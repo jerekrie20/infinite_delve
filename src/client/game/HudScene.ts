@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
-import type { CombatTurn, GearSlot, Hero } from '../../shared/delve';
+import type { GearSlot, Hero } from '../../shared/delve';
+import type { RecentHit } from '../../shared/combat/engine';
 import { formatShort } from '../ui/format';
 import { openItemPopup } from '../ui/gear';
 import { ACTIVES } from '../../shared/content/actives';
 
 /** Live combat + hero state the HUD paints from. LaneScene emits this shape on
- *  the 'hud-changed' game event; the HUD only reads it. */
+ *  the 'hud-changed' game event; the HUD only reads it — cooldowns and hits
+ *  come straight from the engine snapshot (single source of truth). */
 export interface HudSnapshot {
   depth: number;
   bankedGold: number;
@@ -16,8 +18,10 @@ export interface HudSnapshot {
   hp: number;
   maxHp: number;
   hero: Hero;
-  /** Last 5 combat turns for the summary tab. */
-  combatTurns?: CombatTurn[];
+  /** Engine cooldowns, abilityId → remaining ms. */
+  cooldowns?: Record<string, number>;
+  /** Recent hits for the summary tab (per-entity timers — no exchanges). */
+  recentHits?: RecentHit[];
 }
 
 /** The main-page HUD rendered as Phaser canvas objects, skinned with the wooden
@@ -34,6 +38,9 @@ export interface HudHooks {
   openBase: () => void;
   openMenu: () => void;
   cast: (abilityId: string) => void;
+  /** Rotation editor (D30): read + write the priority order for slots 2-5. */
+  getRotation: () => string[];
+  setRotation: (order: string[]) => void;
 }
 
 const DEFAULT_SLICE: Slice = { left: 8, top: 8, right: 8, bottom: 8 };
@@ -77,8 +84,11 @@ export class HudScene extends Phaser.Scene {
     label: Phaser.GameObjects.Text;
     mana: Phaser.GameObjects.Text;
     cdOverlay: Phaser.GameObjects.Graphics;
+    priority?: Phaser.GameObjects.Text;
   }> = [];
-  private cooldowns: Record<string, number> = {}; // abilityId → remaining ms
+  /** Engine cooldowns mirrored from the latest hud-changed snapshot. */
+  private cooldowns: Record<string, number> = {};
+  private recentHits: RecentHit[] = [];
 
   constructor() {
     super('HudScene');
@@ -202,7 +212,9 @@ export class HudScene extends Phaser.Scene {
       this.skillsView.add(this.label(40, 930 + i * 40 + 14, name, 20, '#9d8fc0', 'left'));
     }
 
-    // Skill slots — real buttons for unlocked abilities, locked placeholder for rest.
+    // Skill slots — slot 1 renders the basic attack style (auto-fires, not
+    // tappable, D30); slots 2-5 are cast buttons with a rotation-priority
+    // badge (tap ▲ to promote in the rotation order). Locked slots show 🔒.
     this.skillSlots = [];
     const size = 104, gap = (720 - size * 5) / 4;
     for (let i = 0; i < 5; i++) {
@@ -219,16 +231,31 @@ export class HudScene extends Phaser.Scene {
       const cdGfx = this.add.graphics();
       this.skillsView.add(cdGfx);
 
-      if (def) {
-        // Real ability button
+      if (def && def.basic) {
+        // Basic attack style: informational, fires on the attack timer.
+        const icon = this.label(cx, 1088, def.icon, 30, '#ffffff', 'center');
+        const label = this.label(cx, 1136, def.name, 16, '#d0c8e8', 'center');
+        const mana = this.label(cx, 1152, 'auto', 14, '#9d8fc0', 'center');
+        this.skillsView.add(icon);
+        this.skillsView.add(label);
+        this.skillsView.add(mana);
+        this.skillSlots.push({ bg, icon, label, mana, cdOverlay: cdGfx });
+      } else if (def) {
+        // Rotation ability button
         const icon = this.label(cx, 1088, def.icon, 30, '#ffffff', 'center');
         const label = this.label(cx, 1136, def.name, 16, '#d0c8e8', 'center');
         const mana = this.label(cx, 1152, `${def.manaCost}◆`, 14, '#4aa3ff', 'center');
         this.skillsView.add(icon);
         this.skillsView.add(label);
         this.skillsView.add(mana);
-        bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.tapSkill(i, abilityId!, def.manaCost, def.cooldownMs));
-        this.skillSlots.push({ bg, icon, label, mana, cdOverlay: cdGfx });
+        bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.tapSkill(abilityId!, def.manaCost));
+        // Rotation-priority badge + promote arrow (▲ moves it up one place).
+        const priority = this.label(cx - size / 2 + 14, 1104 - size / 2 + 14, '', 16, '#ffd84a', 'center');
+        this.skillsView.add(priority);
+        const up = this.label(cx + size / 2 - 14, 1104 - size / 2 + 14, '▲', 18, '#c9b8ff', 'center');
+        up.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.promoteInRotation(abilityId!));
+        this.skillsView.add(up);
+        this.skillSlots.push({ bg, icon, label, mana, cdOverlay: cdGfx, priority });
       } else {
         // Locked placeholder
         const lock = this.label(cx, 1104, '🔒', 26, '#6f6690', 'center');
@@ -236,14 +263,42 @@ export class HudScene extends Phaser.Scene {
         this.skillSlots.push({ bg, icon: lock, label: lock, mana: lock, cdOverlay: cdGfx });
       }
     }
+    this.drawRotationBadges();
   }
 
-  /** Tap a skill button — validate mana + cooldown, then fire. */
-  private tapSkill(_idx: number, abilityId: string, manaCost: number, cdMs: number): void {
+  /** Tap a skill button — the engine validates mana/cooldown and queues the
+   *  cast to the next attack beat; this only forwards + pre-checks for feel. */
+  private tapSkill(abilityId: string, manaCost: number): void {
     if (this.cooldowns[abilityId] && this.cooldowns[abilityId]! > 0) return; // on cooldown
     if (this.hero.mana < manaCost) return; // insufficient mana
-    this.cooldowns[abilityId] = cdMs;
     this.hooks.cast(abilityId);
+  }
+
+  /** Move an ability one place up in the rotation priority (wraps: promoting
+   *  the first sends it to the back — one button gives full reordering). */
+  private promoteInRotation(abilityId: string): void {
+    const order = this.hooks.getRotation();
+    const idx = order.indexOf(abilityId);
+    if (idx < 0 || order.length < 2) return;
+    if (idx === 0) {
+      order.push(order.shift()!);
+    } else {
+      [order[idx - 1], order[idx]] = [order[idx]!, order[idx - 1]!];
+    }
+    this.hooks.setRotation(order);
+    this.drawRotationBadges();
+  }
+
+  /** Paint "P1/P2…" rotation-priority badges on slots 2-5. */
+  private drawRotationBadges(): void {
+    const order = this.hooks.getRotation();
+    for (let i = 0; i < 5; i++) {
+      const slot = this.skillSlots[i];
+      const abilityId = this.hero.abilities[i] ?? null;
+      if (!slot?.priority || !abilityId) continue;
+      const pos = order.indexOf(abilityId);
+      slot.priority.setText(pos >= 0 ? `P${pos + 1}` : '');
+    }
   }
 
   private buildEquipView(): void {
@@ -295,9 +350,9 @@ export class HudScene extends Phaser.Scene {
   // ---- tab switching ---------------------------------------------------------
 
   private buildSummaryView(): void {
-    // 5 empty turn rows — filled by onHud from combatTurns
-    for (let i = 0; i < 5; i++) {
-      const y = 920 + i * 36;
+    // Recent-hit rows — filled by onHud from the engine's recentHits ring.
+    for (let i = 0; i < 10; i++) {
+      const y = 920 + i * 30;
       const t = this.label(40, y, '', 18, '#6f6690', 'left');
       this.summaryView.add(t);
       this.summaryTexts.push(t);
@@ -316,15 +371,9 @@ export class HudScene extends Phaser.Scene {
     this.tabEquipText.setColor(which === 'equip' ? '#ffffff' : '#b9add6');
   }
 
-  // ---- cooldown tick -----------------------------------------------------------
+  // ---- cooldown overlays (engine-owned values, painted every frame) ------------
 
-  override update(_time: number, delta: number): void {
-    // Decrement ability cooldowns and redraw overlays.
-    for (const [id, ms] of Object.entries(this.cooldowns)) {
-      if (ms <= 0) continue;
-      const remaining = ms - delta;
-      this.cooldowns[id] = Math.max(0, remaining);
-    }
+  override update(): void {
     this.drawCooldowns();
   }
 
@@ -339,6 +388,7 @@ export class HudScene extends Phaser.Scene {
 
       const g = slot.cdOverlay;
       g.clear();
+      if (def?.basic) continue; // basics have no cooldown/mana overlay
       if (cd > 0 && def) {
         const cx = 40 + size / 2 + i * (size + gap);
         // Dark overlay + remaining seconds text
@@ -365,13 +415,15 @@ export class HudScene extends Phaser.Scene {
     this.hero = s.hero;
     this.hp = s.hp;
     this.maxHp = s.maxHp;
+    this.cooldowns = s.cooldowns ?? {};
+    this.recentHits = s.recentHits ?? [];
     this.depthText.setText(`Depth ${s.depth}`);
     this.moneyText.setText(formatShort(s.bankedGold));
     if (s.haulCount > 0) { this.bagBadge.setVisible(true); this.bagBadgeText.setText(String(s.haulCount)); }
     else this.bagBadge.setVisible(false);
     this.drawBars();
     this.drawGear();
-    this.drawSummary(s.combatTurns ?? []);
+    this.drawSummary(this.recentHits);
   }
 
   private onHero(h: Hero): void {
@@ -418,27 +470,20 @@ export class HudScene extends Phaser.Scene {
     });
   }
 
-  private drawSummary(turns: import('../../shared/delve').CombatTurn[]): void {
-    for (let i = 0; i < 5; i++) {
+  private drawSummary(hits: RecentHit[]): void {
+    for (let i = 0; i < this.summaryTexts.length; i++) {
       const t = this.summaryTexts[i];
       if (!t) continue;
-      const turn = turns[i];
-      if (!turn) { t.setText('').setColor('#6f6690'); continue; }
-      const fmt = (_side: 'hero' | 'monster', action: string, dmg: number, crit: boolean): string => {
-        if (!action) return '—';
-        if (action === 'dodged') return 'missed';
-        if (action === 'blocked') return 'blocked';
-        if (action === 'execute') return 'EXECUTED!';
-        const d = `${dmg}${crit ? '💥' : ''}`;
-        if (action === 'attack') return `hit ${d}`;
-        return `${action} ${d}`;
-      };
-      const heroStr = fmt('hero', turn.heroAction, turn.heroDmg, turn.heroCrit);
-      const monStr = fmt('monster', turn.monsterAction, turn.monsterDmg, turn.monsterCrit);
-      const line = `D${turn.depth}  ⚔️${heroStr.padEnd(16)} 🛡️${monStr}`;
-      t.setText(line);
-      const heroWinning = turn.heroDmg > turn.monsterDmg;
-      t.setColor(heroWinning ? '#5bd06a' : turn.heroDmg === turn.monsterDmg ? '#b9add6' : '#ff5470');
+      const hit = hits[i];
+      if (!hit) { t.setText('').setColor('#6f6690'); continue; }
+      const who = hit.side === 'hero' ? '⚔️' : '🛡️';
+      const what =
+        hit.action === 'dodged' ? 'missed'
+        : hit.action === 'blocked' ? 'blocked'
+        : hit.action === 'execute' ? 'EXECUTED!'
+        : `${hit.action} ${hit.dmg}${hit.crit ? '💥' : ''}`;
+      t.setText(`D${hit.depth}  ${who} ${what}`);
+      t.setColor(hit.side === 'hero' ? '#5bd06a' : '#ff5470');
     }
   }
 
