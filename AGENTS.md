@@ -1,52 +1,40 @@
-You are writing a Devvit web application that will be executed on Reddit.com.
+# Delve — Agent Brief
 
-## Tech Stack
+Idle looter RPG running as a Reddit Devvit **web** app. Phaser client in an
+iframe · Hono server on Devvit serverless · Redis persistence · shared pure
+TypeScript game layer.
 
-- **Frontend**: Phaser, Vite
-- **Backend**: Node.js v22 serverless environment (Devvit), Hono, TRPC
-- **Communication**: tRPC v11 for end-to-end type safety
+**Read these, in order, before non-trivial work:**
 
-## Layout & Architecture
+1. `CODING_BIBLE.md` — engineering law + project structure (this repo)
+2. `game_design/DECISIONS.md` — design source of truth (D1-D49). Design
+   questions are answered THERE, never improvised in code
+3. `game_design/PLAYBOOK.md` — checklists when adding any content
+4. `TODO.md` — the build roadmap (phases; gates in `game_design/METRICS.md`)
 
-- `/src/server`: **Backend Code**. This runs in a secure, serverless environment.
-  - `trpc.ts`: Defines the API router and procedures.
-  - `index.ts`: Main server entry point (Hono app).
-  - Access `redis`, `reddit`, and `context` here via `@devvit/web/server`.
-- `/src/client`: **Frontend Code**. This is executed inside of an iFrame on reddit.com
-  - To add an entrypoint, create a HTML file and add to the mapping inside of `devvit.json`
-  - Entrypoints:
-    - `game.html`: The main React entry point (Expanded View).
-    - `splash.html`: The initial React entry point (Inline View). This will be shown in the reddit.com feed. Please keep it fast and keep heavy dependencies inside of `game.html`
-- `/src/shared`: **Shared Code**. Code to share between the client and server
+## Tech stack (actual — no tRPC, no React)
 
-## Frontend
+- **Client** (`src/client/`): Phaser 3 + DOM overlay panels, Vite-built.
+  Entrypoints `index.html` (game) + `splash.html` (inline feed view — keep
+  featherweight) mapped in `devvit.json`
+- **Server** (`src/server/`): Hono routes on Node 22 Devvit serverless.
+  `redis`/`reddit`/`context` via `@devvit/web/server`. `/api/*` = client
+  endpoints, `/internal/*` = menu/forms/triggers/scheduler (must be mapped
+  in `devvit.json`)
+- **Shared** (`src/shared/`): pure game math + data registries. No I/O, no
+  client/server imports, no `Math.random` (injected `Rng` only)
 
-### Rules
+## Hard rules
 
-- Instead of `window.location` or `window.assign`, use `navigateTo` from `@devvit/web/client`
+- **No builds in dev**: never run `npm run build` / `devvit` CLI /
+  `vite build` unprompted. Validate with `npm run type-check`,
+  `npm run lint`, `npx tsx tests/<file>` (there is NO `npm run test` yet)
+- Devvit web only — never use `@devvit/public-api` or "blocks" code
+- Client: `navigateTo` not `window.location`; `showToast`/`showForm` not
+  `alert`; no inline script tags in HTML
+- Server owns all value; never trust client amounts; new endpoints ship
+  with rate limits + input caps
+- Named exports, no default exports, no type casts, descriptive full-word
+  variable names, house file-header comments
 
-### Limitations
-
-- `window.alert`: Use `showToast` or `showForm` from `@devvit/web/client`
-- File downloads: Use clipboard API with `showToast` to confirm
-- Geolocation, camera, microphone, and notifications web APIs: No alternatives
-- Inline script tags inside of `html` files: Use a script tag and separate js/ts file
-
-## Commands
-
-- `npm run type-check`: Check typescript types
-- `npm run lint`: Check the linter
-- `npm run test -- my-file-name`: Run tests isolated to a file
-
-## Code Style
-
-- Prefer type aliases over interfaces when writing typescript
-- Prefer named exports over default exports
-- Never cast typescript types
-
-## Global Rules
-
-- You may find code that references blocks or `@devvit/public-api` while building a feature. Do NOT use this code as this project is configured to use Devvit web only.
-- Whenever you add an endpoint for a new menu item action, ensure that you've added the corresponding mapping to `devvit.json` so that it is properly registered
-
-Docs: https://developers.reddit.com/docs/llms.txt.
+Docs: https://developers.reddit.com/docs/llms.txt
