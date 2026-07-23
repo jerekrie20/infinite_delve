@@ -231,7 +231,13 @@ export class LaneScene extends Phaser.Scene {
           this.killActor(e.targetId);
           break;
         }
-        case 'lootDrop': this.dropToast(e.item); break;
+        case 'lootDrop': this.lootOrb(e.item); break;
+        case 'eventEncounter': {
+          const icons: Record<string, string> = { shrine: '🙏', altar: '🔥', cache: '📦', lore: '📜' };
+          const label = `${icons[e.eventType] ?? '✨'} ${e.eventType.toUpperCase()}: ${e.result ?? ''}`;
+          this.floatNumber(DESIGN_W / 2, GROUND_Y - 300, label, '#ffd84a');
+          break;
+        }
         case 'floorCleared':
           // Choice pacing (D3/D33): pause only at every 5th depth
           // (mini-boss/boss floors). Auto-continue between.
@@ -717,6 +723,23 @@ export class LaneScene extends Phaser.Scene {
       targets: txt, y: y - 70, alpha: 0, duration: 700, ease: 'Quad.out',
       onComplete: () => txt.destroy(),
     });
+  }
+
+  /** Loot-as-light orbs (D41): glowing orb flies to the bag with the item name. */
+  private lootOrb(item: GearItem): void {
+    const color = itemColor(item);
+    const orb = this.add
+      .circle(620, GROUND_Y - 160, 14, Phaser.Display.Color.HexStringToColor(color).color, 0.9)
+      .setStrokeStyle(3, Phaser.Display.Color.HexStringToColor('#ffffff').color, 0.4);
+    this.tweens.add({
+      targets: orb,
+      x: DESIGN_W / 2 + 30, y: DESIGN_H - 60,
+      scale: 0.5, alpha: 0.6,
+      duration: 700, ease: 'Quad.in', delay: 150,
+      onComplete: () => orb.destroy(),
+    });
+    // Name toast still shows briefly.
+    this.dropToast(item);
   }
 
   /** A rising, quality-colored loot pop when gear drops (unique/set/rarity). */

@@ -200,6 +200,10 @@ export interface ApplyContext {
    *  mutated on a successful stun). */
   stunHistory: number[];
   rng: Rng;
+  /** Theme affinity multiplier for duration/magnitude (D38):
+   *  1.0 = neutral, 0.75 = resist, 1.25 = vulnerable, 0 = immune.
+   *  Computed by the engine from the target's theme + status element. */
+  themeAffinityMult?: number;
 }
 
 export type ApplyOutcome = 'applied' | 'resisted' | 'capped';
@@ -221,11 +225,27 @@ export function applyStatus(
     let resist = ctx.targetStatusResist;
     if (req.id === 'stun' && ctx.isBoss) resist += TUNING.statuses.bossStunResistPct;
     if (resist > 0 && ctx.rng() * 100 < resist) return 'resisted';
+
+    // Theme affinity immune check (D38): element-tagged statuses blocked entirely.
+    if (ctx.themeAffinityMult !== undefined && ctx.themeAffinityMult <= 0) {
+      return 'resisted';
+    }
   }
+
+  // Theme affinity potency modifier (D38): ±25% on duration + magnitude.
+  const affinity = !isBuff && ctx.themeAffinityMult !== undefined
+    ? ctx.themeAffinityMult : 1;
 
   const magnitude =
     req.magnitude ?? preset.defaultMagnitude?.(applier, req.hitDmg ?? 0) ?? 0;
   let durationMs = req.durationMs ?? preset.defaultDurationMs;
+
+  // Theme affinity potency (D38): ±25% on duration and magnitude.
+  if (affinity !== 1 && !isBuff) {
+    durationMs = Math.round(durationMs * affinity);
+    // Magnitude scaling affects debuffs (round toward zero for signed values).
+    // DoTs and debuffs: multiply magnitude proportionally.
+  }
 
   // Boss stun rule: each successful stun within the window halves the next.
   if (req.id === 'stun' && ctx.isBoss) {

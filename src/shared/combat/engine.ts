@@ -21,10 +21,11 @@ import {
   statusAtkPct, statusAttackSpeedPct, statusDefenseDelta, statusDamageTakenPct,
   statusHealingTakenPct, isStunned, hasUndying, shockBonusPct, consumeShock,
   addShield, absorbWithShield, shieldPool,
-  type ActiveStatus, type ApplierView, type ModQuantity, type StatusId,
+  STATUS_PRESETS,
+  type ActiveStatus, type ApplierView, type ApplyContext, type ModQuantity, type StatusId,
 } from './statuses';
 import { chooseBeatAction, type RotationState } from './rotation';
-import type { BossSignature } from '../content/monsters';
+import { themeAffinityMult, type BossSignature } from '../content/monsters';
 
 // ---- Entities ---------------------------------------------------------------
 
@@ -131,6 +132,8 @@ export interface PackMemberView {
   passiveNames?: string[];
 }
 
+export type EventType = 'shrine' | 'altar' | 'cache' | 'lore';
+
 export type CombatEvent =
   | { type: 'floorStart'; depth: number; pack: PackMemberView[] }
   | { type: 'hit'; sourceId: string; targetId: string; dmg: number; crit: boolean; action: string; targetHp: number }
@@ -146,6 +149,7 @@ export type CombatEvent =
   | { type: 'kill'; targetId: string; gold: number }
   | { type: 'lootDrop'; item: GearItem }
   | { type: 'bossWindUp'; bossId: string; signatureName: string }
+  | { type: 'eventEncounter'; eventType: EventType; depth: number; result?: string }
   | { type: 'floorCleared'; depth: number; nextDepth: number }
   | { type: 'runEnded'; outcome: 'died' | 'extracted'; depthCleared: number; runGold: number; haul: GearItem[] };
 
@@ -310,7 +314,20 @@ export class CombatEngine {
     });
   }
 
+  /** Event floors fire ~1-in-8 on non-boss, non-mini-boss depths (D42). */
+  private isEventDepth(d: number): boolean {
+    // Boss floors (10,20,30…) and mini-boss floors (5,15,25…) never events.
+    if (d % 10 === 0 || d % 5 === 0) return false;
+    // Seeded roll: 12.5% = 1-in-8 ⚙
+    return this.rng() < 0.125;
+  }
+
   private spawnPack(): void {
+    // Event floors (D42): skip the fight, resolve the encounter.
+    if (this.isEventDepth(this.depth)) {
+      this.resolveEvent();
+      return;
+    }
     const pack = packForDepth(this.depth, this.rng);
     this.monsters = pack.map((m) => this.buildMonster(m));
     this.fightMs = 0;
@@ -448,6 +465,9 @@ export class CombatEngine {
         // the signature actions instead of a normal swing.
         if (m.bossSignature?.windingUp) {
           this.fireBossSignature(m);
+        } else if (m.kind === 'support') {
+          // Support monsters (D40): heal or buff a random pack member.
+          this.supportAction(m);
         } else {
           this.resolveHit(m, this.hero, { mult: 1, action: 'attack' });
         }
@@ -594,6 +614,87 @@ export class CombatEngine {
         }
       }
     }
+  }
+
+  // ---- event floors (D42) ---------------------------------------------------
+
+  /** Resolve an event encounter: shrine (run buff), altar (HP→chest), cache
+   *  (choice of 2 items), or lore (flavor + gold). Auto-resolve picks the
+   *  deterministic best outcome so the sim and replay stay seeded. */
+  private resolveEvent(): void {
+    const types: EventType[] = ['shrine', 'altar', 'cache', 'lore'];
+    const evt = types[Math.floor(this.rng() * types.length)]!;
+
+    let result = '';
+    switch (evt) {
+      case 'shrine': {
+        // Run-long boon: +8% ATK (rage-lite, permanent). Auto-resolve = always take.
+        this.applyStatusTo(this.hero, this.hero, {
+          id: 'rage', magnitude: 8, durationMs: 999_999_999,
+        }, 'shrine', true, 0);
+        result = '+8% ATK for the run';
+        break;
+      }
+      case 'altar': {
+        // Gamble altar: pay 15% HP → high-rarity drop. Auto-resolve = risk it.
+        const hpCost = Math.round(this.hero.maxHp * 0.15);
+        this.applyRawDamage(this.hero, hpCost);
+        const drop = rollDrop(this.depth, false, this.rng);
+        if (drop) {
+          this.runHaul.push(drop);
+          this.emit({ type: 'lootDrop', item: drop });
+        }
+        result = `paid ${hpCost} HP${drop ? ', got ' + drop.r + ' item' : ''}`;
+        break;
+      }
+      case 'cache': {
+        // Treasure cache: one free item. Auto-resolve = take best gearScore.
+        const drop = rollDrop(this.depth, false, this.rng);
+        if (drop) {
+          this.runHaul.push(drop);
+          this.emit({ type: 'lootDrop', item: drop });
+        }
+        result = drop ? `found ${drop.r} ${drop.base}` : 'empty';
+        break;
+      }
+      case 'lore': {
+        // Lore encounter: small gold reward + worldbuilding flavor.
+        const gold = Math.round((TUNING.monster.baseGold + TUNING.monster.goldPerDepth * this.depth) * 2);
+        this.runGold += gold;
+        result = `+${gold}◆`;
+        break;
+      }
+    }
+
+    this.emit({ type: 'eventEncounter', eventType: evt, depth: this.depth, result });
+    // Event floor cleared — same as a normal floor clear.
+    cleanseForNextFloor(this.hero.statuses);
+    this.hero.revived = false;
+    this.phase = 'choosing';
+    this.emit({ type: 'floorCleared', depth: this.depth, nextDepth: this.depth + 1 });
+  }
+
+  // ---- support monster AI (D40) --------------------------------------------
+
+  /** Support monster action: heal a random alive pack member (not self) for
+   *  15% of the support's attack value ⚙. Backline supports create kill-order
+   *  decisions — clear them first or they sustain the pack. */
+  private supportAction(support: EngineEntity): void {
+    const allies = this.monsters.filter((m) => m.hp > 0 && m.id !== support.id);
+    if (allies.length === 0) {
+      // No allies — swing weakly at the hero instead.
+      this.resolveHit(support, this.hero, { mult: 0.5, action: 'support' });
+      return;
+    }
+    const target = allies[Math.floor(this.rng() * allies.length)]!;
+    const healAmount = Math.max(1, Math.round(support.attack * 0.15));
+    if (target.hp < target.maxHp) {
+      this.heal(target, healAmount, 'support');
+    }
+    // Also apply a small buff: Rage (+10% ATK, 3s) — makes supports dangerous.
+    this.applyStatusTo(support, target, {
+      id: 'rage', magnitude: 10, durationMs: 3000,
+    }, 'support', false, 0);
   }
 
   // ---- targeting -----------------------------------------------------------
@@ -845,10 +946,13 @@ export class CombatEngine {
     extra?: { modTarget?: ModQuantity },
   ): void {
     const applierView: ApplierView = { attack: applier.attack, derived: applier.derived };
-    const outcome = applyStatus(target.statuses, {
-      id: req.id, source, magnitude: req.magnitude, durationMs: req.durationMs,
-      hitDmg: req.hitDmg ?? hitDmg, modTarget: extra?.modTarget,
-    }, applierView, {
+    // Theme affinity (D38): compute multiplier from target's template theme
+    // and the status's element tag.
+    const statusElement = STATUS_PRESETS[req.id]?.element;
+    const themeMult = !selfApplied && statusElement && target.templateId
+      ? themeAffinityMult(target.templateId, statusElement)
+      : 1;
+    const ctx: ApplyContext = {
       targetStatusResist: target.derived.statusResist ?? 0,
       targetMaxHp: target.maxHp,
       selfApplied,
@@ -856,7 +960,12 @@ export class CombatEngine {
       fightMs: this.fightMs,
       stunHistory: target.stunHistory,
       rng: this.rng,
-    });
+      ...(themeMult !== 1 ? { themeAffinityMult: themeMult } : {}),
+    };
+    const outcome = applyStatus(target.statuses, {
+      id: req.id, source, magnitude: req.magnitude, durationMs: req.durationMs,
+      hitDmg: req.hitDmg ?? hitDmg, modTarget: extra?.modTarget,
+    }, applierView, ctx);
     if (outcome === 'applied') {
       const inst = target.statuses.find((s) => s.id === req.id);
       this.emit({ type: 'statusApplied', targetId: target.id, statusId: req.id, stacks: inst?.stacks ?? 1 });

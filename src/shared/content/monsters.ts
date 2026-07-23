@@ -343,6 +343,18 @@ export function affinityForTemplate(templateId: string): ThemeAffinity | undefin
   return tpl?.theme ? THEME_AFFINITIES[tpl.theme] : undefined;
 }
 
+/** Compute the theme affinity multiplier for applying a status element to a
+ *  template's target (D38): 1.0 neutral, 0.75 resist, 1.25 vulnerable, 0 immune.
+ *  Returns 1 if either the template or element is unknown (no affinity). */
+export function themeAffinityMult(templateId: string, element: ElementTag): number {
+  const aff = affinityForTemplate(templateId);
+  if (!aff) return 1;
+  if (aff.immune.includes(element)) return 0;
+  if (aff.vulnerable.includes(element)) return 1.25;
+  if (aff.resists.includes(element)) return 0.75;
+  return 1;
+}
+
 // ---- Spawn-table sanity --------------------------------------------------------
 
 /** Verify every depth 1-60 has ≥2 non-boss templates active (roster.md rule). */
