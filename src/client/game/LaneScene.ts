@@ -274,6 +274,11 @@ export class LaneScene extends Phaser.Scene {
       this.idleBob(sprite, 150 + i * 120);
       this.actors.set(view.id, { view, sprite, spec, x, dead: false });
       this.floatNumber(x, GROUND_Y - spec.displayH - 55, view.name, MONSTER_RARITY_COLORS[view.rarity] ?? '#ffffff');
+      // Elite/boss passive badges (D34): show stat names below the name.
+      if (view.passiveNames && view.passiveNames.length > 0) {
+        const badgeText = view.passiveNames.slice(0, 3).join(' · ');
+        this.floatNumber(x, GROUND_Y - spec.displayH - 82, badgeText, '#c9b8ff');
+      }
     });
 
     // Boss floor: show the boss name banner at the top of the lane.
@@ -350,7 +355,22 @@ export class LaneScene extends Phaser.Scene {
 
   private onDied(reached: number): void {
     this.over = true;
-    const runId = this.runId; // capture — resetRun rotates it before the post may settle
+    const snap = this.engine.snapshot();
+    const runGold = snap.runGold;
+    const haulCount = snap.haulCount;
+
+    // Death recap (D35): killer + last exchanges + what was lost.
+    const recent = snap.recentHits.slice(-5);
+    const killerLine = recent.length > 0
+      ? recent.filter((h) => h.side === 'monster').slice(-1).map((h) => `by ${h.action} (${h.dmg} dmg${h.crit ? ' CRIT' : ''})`)[0] ?? ''
+      : '';
+    const recapLines = [`Died at depth ${reached}`];
+    if (killerLine) recapLines.push(killerLine);
+    if (haulCount > 0 || runGold > 0) {
+      recapLines.push(`Lost: ${runGold > 0 ? `+${runGold}◆` : ''}${haulCount > 0 ? ` ${haulCount} gear` : ''}`);
+    }
+
+    const runId = this.runId;
     void postRunResult('died', reached, [], runId).then((result) => {
       if (result.status === 'retryable') {
         enqueueRun(localStorage, {
@@ -363,9 +383,9 @@ export class LaneScene extends Phaser.Scene {
       }
       this.sys.game.events.emit('run-resolved', { outcome: 'died', reached });
     });
-    this.banner('DIED', '#ff5470');
-    // After death, show checkpoint picker (D4): the player picks where to restart.
-    this.time.delayedCall(2000, () => this.pickCheckpointAndRestart());
+    this.banner(recapLines.join('\n'), '#ff5470');
+    // After death recap fades, show checkpoint picker (D4).
+    this.time.delayedCall(2500, () => this.pickCheckpointAndRestart());
   }
 
   /** Show the checkpoint picker, then restart the run at the chosen depth (D4). */

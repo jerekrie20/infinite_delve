@@ -7,8 +7,7 @@
 // Never re-implement a combat rule outside this module.
 
 import type { GearItem, Hero, MonsterRarity } from '../delve';
-import type { DerivedId, DerivedMap, HookPoint, StatId } from '../content/stats';
-import { STATS } from '../content/stats';
+import { STATS, type DerivedId, type DerivedMap, type HookPoint, type StatId } from '../content/stats';
 import { HANDLERS, type Combatant, type HandlerResult, type StatusRequest } from '../content/handlers';
 import { ACTIVES, type Targeting } from '../content/actives';
 import { classDef } from '../content/classes';
@@ -128,6 +127,8 @@ export interface PackMemberView {
   maxHp: number;
   /** Boss signature name for telegraph display (undefined for non-bosses). */
   signatureName?: string;
+  /** Passive stat names for elite/boss badge display (D34). */
+  passiveNames?: string[];
 }
 
 export type CombatEvent =
@@ -294,12 +295,17 @@ export class CombatEngine {
   private packView(): PackMemberView[] {
     return this.monsters.map((m) => {
       const sig = m.bossSignature?.def.name;
+      // Elite/boss passive names for badge display (D34).
+      const passiveNames = (m.rarity === 'elite' || m.rarity === 'boss')
+        ? Object.keys(m.derived).filter((k) => STATS[k as StatId]?.kind === 'behavioral')
+        : undefined;
       return {
         id: m.id, name: m.name, kind: m.kind ?? 'grunt', row: m.row,
         rarity: m.rarity === 'hero' ? 'normal' : m.rarity,
         sprite: m.sprite, templateId: m.templateId ?? '',
         hp: m.hp, maxHp: m.maxHp,
         ...(sig ? { signatureName: sig } : {}),
+        ...(passiveNames?.length ? { passiveNames } : {}),
       };
     });
   }

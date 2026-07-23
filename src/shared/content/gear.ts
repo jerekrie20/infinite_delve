@@ -21,12 +21,19 @@ export const STASH_CAP = 30;
 
 /** Bank a run's haul: auto-equip anything that beats the current slot item
  *  (best-first, so the strongest wins and displaced items go to stash), the
- *  rest to stash. Trims the stash to the cap. Returns how many auto-equipped. */
+ *  rest to stash. Protected items (set/unique) are NEVER displaced by
+ *  auto-equip — the player must manually swap them (D33). Trims the stash
+ *  to the cap. Returns how many auto-equipped. */
 export function bankHaul(state: GearState, haul: GearItem[]): number {
   let equippedCount = 0;
   const ordered = [...haul].sort((a, b) => gearScore(b) - gearScore(a));
   for (const item of ordered) {
     const current = state.equipped[item.slot];
+    // Protected items: set/unique gear is never auto-displaced (D33).
+    if (current && (current.set || current.unique)) {
+      state.stash.push(item);
+      continue;
+    }
     if (!current || gearScore(item) > gearScore(current)) {
       state.equipped[item.slot] = item;
       if (current) state.stash.push(current);
