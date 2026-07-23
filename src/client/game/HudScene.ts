@@ -429,6 +429,7 @@ export class HudScene extends Phaser.Scene {
   private onHero(h: Hero): void {
     this.hero = h;
     this.moneyText.setText(formatShort(h.gold));
+    this.drawBars();
     this.drawGear();
   }
 

@@ -151,14 +151,30 @@ export type PostRunResult =
   | { status: 'retryable' }
   | { status: 'rejected' };
 
+/** Client-side guard so we don't fire a request the server will 429.
+ *  Mirrors RATE_LIMITS.runResult (1 per 30s ⚙) + 1s padding. */
+let lastRunResultPostMs = 0;
+const RUN_RESULT_COOLDOWN_MS = 31_000;
+
 /** Bank an active run. `runId` is the client-generated idempotency id — pass
- *  the SAME one on every retry of the same run. */
+ *  the SAME one on every retry of the same run. Honours the server's 30s
+ *  rate-limit window client-side so the browser never logs a 429 for this
+ *  endpoint. Set `skipCooldown` when replaying from the retry queue (boot-time
+ *  flush — the queued runs are already rate-limited from their original attempt
+ *  and the server's dedupe makes them free). */
 export async function postRunResult(
   outcome: RunOutcome,
   depthReached: number,
   haul: GearItem[] = [],
-  runId?: string
+  runId?: string,
+  skipCooldown?: boolean
 ): Promise<PostRunResult> {
+  const now = Date.now();
+  if (!skipCooldown && now - lastRunResultPostMs < RUN_RESULT_COOLDOWN_MS) {
+    console.warn('[delve] /api/run/result skipped — within client cooldown, queued for retry');
+    return { status: 'retryable' };
+  }
+  lastRunResultPostMs = now;
   try {
     const res = await fetch('/api/run/result', {
       method: 'POST',

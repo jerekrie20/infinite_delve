@@ -54,8 +54,9 @@ export function initGearPanel(d: GearDeps): void {
   backdrop = document.getElementById('gear-panel');
   content = document.getElementById('gear-content');
 
-  document.getElementById('gear-close')?.addEventListener('click', close);
+  document.getElementById('gear-close')?.addEventListener('click', (e) => { e.stopPropagation(); close(); });
   backdrop?.addEventListener('click', (e) => {
+    e.stopPropagation();
     if (e.target === backdrop) close();
   });
 
@@ -64,6 +65,7 @@ export function initGearPanel(d: GearDeps): void {
   content?.addEventListener('click', (e) => {
     const row = (e.target as HTMLElement).closest<HTMLElement>('[data-open-slot],[data-open-id]');
     if (!row || !deps) return;
+    e.stopPropagation();
     const hero = deps.getHero();
     const slot = row.dataset.openSlot as GearSlot | undefined;
     const id = row.dataset.openId;
@@ -138,6 +140,7 @@ function ensureItemPopup(): HTMLElement {
     `</div>`;
   document.body.appendChild(el);
   el.addEventListener('click', (e) => {
+    e.stopPropagation();
     if (e.target === el) closeItemPopup();
   });
   el.querySelector('.panel-close')?.addEventListener('click', closeItemPopup);
@@ -179,16 +182,20 @@ export function openItemPopup(it: GearItem, opts: { equipped?: boolean } = {}): 
     (setName ? `<div class="ip-set">Part of <b>${esc(setName)}</b></div>` : '') +
     `<div class="ip-actions">${actions}</div>`;
 
-  // Wire the contextual actions to the shared gear deps, then close.
-  body.querySelector('[data-act="unequip"]')?.addEventListener('click', () => {
+  // Wire the contextual actions to the shared gear deps, then close. Stop
+  // propagation so pointer events never reach the Phaser canvas underneath.
+  body.querySelector('[data-act="unequip"]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
     void deps?.changeGear(undefined, it.slot);
     closeItemPopup();
   });
-  body.querySelector('[data-act="equip"]')?.addEventListener('click', () => {
+  body.querySelector('[data-act="equip"]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
     void deps?.changeGear(it.id);
     closeItemPopup();
   });
-  body.querySelector('[data-act="sell"]')?.addEventListener('click', () => {
+  body.querySelector('[data-act="sell"]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
     void deps?.sellGear(it.id);
     closeItemPopup();
   });

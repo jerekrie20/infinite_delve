@@ -9,12 +9,14 @@ import { initDailyPanel, refreshDailyPanel } from './ui/daily';
 import { initGearPanel, openGearPanel } from './ui/gear';
 
 /** Wire an overlay panel's dismissal (close button + tap-out on the backdrop).
- *  Panels are OPENED from the canvas HUD via HudHooks, not from DOM triggers. */
+ *  Panels are OPENED from the canvas HUD via HudHooks, not from DOM triggers.
+ *  Stops propagation so clicks inside panels never reach the Phaser canvas. */
 function wirePanelClose(panelId: string, closeId: string): void {
   const backdrop = document.getElementById(panelId);
   const hide = (): void => backdrop?.classList.remove('show');
-  document.getElementById(closeId)?.addEventListener('click', hide);
+  document.getElementById(closeId)?.addEventListener('click', (e) => { e.stopPropagation(); hide(); });
   backdrop?.addEventListener('click', (e) => {
+    e.stopPropagation();
     if (e.target === backdrop) hide();
   });
 }
@@ -26,7 +28,7 @@ async function boot(): Promise<void> {
   // burn the 30s rate-limit window against the player's next live run.
   try {
     const { recovered } = await flushQueue(localStorage, Date.now(), async (run) => {
-      const result = await postRunResult(run.outcome, run.depthReached, run.haul, run.runId);
+      const result = await postRunResult(run.outcome, run.depthReached, run.haul, run.runId, true);
       return result.status;
     });
     if (recovered > 0) {

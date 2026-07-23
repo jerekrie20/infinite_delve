@@ -126,9 +126,12 @@ export class LaneScene extends Phaser.Scene {
     this.startEngine();
   }
 
-  /** Fresh engine = fresh run: new runId, seed derived from it, depth 1. */
+  /** Fresh engine = fresh run: new runId, seed derived from it, depth 1.
+   *  Reloads the rotation order from the hero's current abilities so newly
+   *  unlocked actives (e.g. Fortify at level 5) are included immediately. */
   private startEngine(): void {
     this.runId = newRunId();
+    this.rotationOrder = loadRotationOrder(localStorage, this.hero.abilities);
     this.engine = new CombatEngine({
       hero: this.hero,
       derived: this.heroDerived,
