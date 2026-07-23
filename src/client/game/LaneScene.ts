@@ -213,6 +213,14 @@ export class LaneScene extends Phaser.Scene {
           }
           break;
         case 'shieldChanged': break; // bars repaint every frame
+        case 'bossWindUp': {
+          const bossActor = this.actors.get(e.bossId);
+          if (bossActor) {
+            this.floatNumber(bossActor.x, GROUND_Y - bossActor.spec.displayH - 70,
+              `⚡ ${e.signatureName}`, '#ffb020');
+          }
+          break;
+        }
         case 'revive': this.floatAt(e.targetId, 'REVIVED!', '#ffe066'); break;
         case 'kill': {
           this.floatAt(e.targetId, `+${e.gold}◆`, '#ffe066');
@@ -255,6 +263,14 @@ export class LaneScene extends Phaser.Scene {
       this.actors.set(view.id, { view, sprite, spec, x, dead: false });
       this.floatNumber(x, GROUND_Y - spec.displayH - 55, view.name, MONSTER_RARITY_COLORS[view.rarity] ?? '#ffffff');
     });
+
+    // Boss floor: show the boss name banner at the top of the lane.
+    const boss = pack.find((v) => v.rarity === 'boss');
+    if (boss) {
+      const bannerLines = [`⚔ BOSS FLOOR ${this.engine.snapshot().depth} ⚔`, boss.name];
+      if (boss.signatureName) bannerLines.push(`Watch for: ${boss.signatureName}`);
+      this.banner(bannerLines.join('\n'), '#ffb020');
+    }
   }
 
   private killActor(id: string): void {

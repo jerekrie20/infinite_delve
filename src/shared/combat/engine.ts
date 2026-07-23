@@ -25,6 +25,7 @@ import {
   type ActiveStatus, type ApplierView, type ModQuantity, type StatusId,
 } from './statuses';
 import { chooseBeatAction, type RotationState } from './rotation';
+import type { BossSignature } from '../content/monsters';
 
 // ---- Entities ---------------------------------------------------------------
 
@@ -56,6 +57,12 @@ export interface EngineEntity extends Combatant {
   /** Reward carried by this monster (0 for the hero). */
   gold: number;
   xp: number;
+  /** Boss signature cooldown + wind-up state (undefined for non-bosses). */
+  bossSignature?: {
+    def: BossSignature;
+    cooldownMs: number;
+    windingUp: boolean;
+  };
 }
 
 export type HookGroups = Record<HookPoint, Array<{ stat: StatId; val: number }>>;
@@ -119,6 +126,8 @@ export interface PackMemberView {
   templateId: string;
   hp: number;
   maxHp: number;
+  /** Boss signature name for telegraph display (undefined for non-bosses). */
+  signatureName?: string;
 }
 
 export type CombatEvent =
@@ -135,6 +144,7 @@ export type CombatEvent =
   | { type: 'revive'; targetId: string }
   | { type: 'kill'; targetId: string; gold: number }
   | { type: 'lootDrop'; item: GearItem }
+  | { type: 'bossWindUp'; bossId: string; signatureName: string }
   | { type: 'floorCleared'; depth: number; nextDepth: number }
   | { type: 'runEnded'; outcome: 'died' | 'extracted'; depthCleared: number; runGold: number; haul: GearItem[] };
 
@@ -244,7 +254,7 @@ export class CombatEngine {
 
   private buildMonster(m: PackMember): EngineEntity {
     this.monsterSeq += 1;
-    return {
+    const entity: EngineEntity = {
       id: `m${this.monsterSeq}`,
       side: 'monster',
       name: m.name,
@@ -270,15 +280,28 @@ export class CombatEngine {
       gold: m.gold,
       xp: m.xp,
     };
+    // Boss signature initialization (D39): cooldown-driven, one-beat telegraph.
+    if (m.signature && entity.rarity === 'boss') {
+      entity.bossSignature = {
+        def: m.signature,
+        cooldownMs: m.signature.firstDelayMs,
+        windingUp: false,
+      };
+    }
+    return entity;
   }
 
   private packView(): PackMemberView[] {
-    return this.monsters.map((m) => ({
-      id: m.id, name: m.name, kind: m.kind ?? 'grunt', row: m.row,
-      rarity: m.rarity === 'hero' ? 'normal' : m.rarity,
-      sprite: m.sprite, templateId: m.templateId ?? '',
-      hp: m.hp, maxHp: m.maxHp,
-    }));
+    return this.monsters.map((m) => {
+      const sig = m.bossSignature?.def.name;
+      return {
+        id: m.id, name: m.name, kind: m.kind ?? 'grunt', row: m.row,
+        rarity: m.rarity === 'hero' ? 'normal' : m.rarity,
+        sprite: m.sprite, templateId: m.templateId ?? '',
+        hp: m.hp, maxHp: m.maxHp,
+        ...(sig ? { signatureName: sig } : {}),
+      };
+    });
   }
 
   private spawnPack(): void {
@@ -415,7 +438,13 @@ export class CombatEngine {
       if (m.hp <= 0 || isStunned(m.statuses)) continue;
       if (m.timer.advance(stepMs)) {
         m.timer.rearm(this.entityIntervalMs(m));
-        this.resolveHit(m, this.hero, { mult: 1, action: 'attack' });
+        // Boss signature wind-up: the one-beat telegraph completes → fire
+        // the signature actions instead of a normal swing.
+        if (m.bossSignature?.windingUp) {
+          this.fireBossSignature(m);
+        } else {
+          this.resolveHit(m, this.hero, { mult: 1, action: 'attack' });
+        }
         if (this.phase !== 'fighting') return;
       }
     }
@@ -467,6 +496,17 @@ export class CombatEngine {
       if (monTick.heal > 0) this.heal(m, monTick.heal, 'regen');
       const tick = collectHook('perTick', m, this.hero, 0, this.rng);
       if (tick.regen && m.hp > 0 && m.hp < m.maxHp) this.heal(m, tick.regen, 'hpRegen');
+
+      // Boss signature cooldown (D39): ticks down each second; when it hits
+      // zero, the wind-up begins — one attack beat of telegraph before the
+      // signature fires.
+      if (m.bossSignature && !m.bossSignature.windingUp) {
+        m.bossSignature.cooldownMs -= TUNING.statuses.tickMs;
+        if (m.bossSignature.cooldownMs <= 0) {
+          m.bossSignature.windingUp = true;
+          this.emit({ type: 'bossWindUp', bossId: m.id, signatureName: m.bossSignature.def.name });
+        }
+      }
     }
   }
 
@@ -511,6 +551,40 @@ export class CombatEngine {
           this.applyStatusTo(this.hero, target, {
             id: st.id, magnitude: st.magnitude, durationMs: st.durationMs,
           }, def.id, false, 0, st.modTarget ? { modTarget: st.modTarget } : undefined);
+        }
+      }
+    }
+  }
+
+  // ---- boss signatures (D39) -----------------------------------------------
+
+  /** Fire a boss's signature move — the wind-up has completed (one beat of
+   *  telegraph), now the big effect lands. Uses the existing damage + status
+   *  pipelines so every effect is one of two actions: buffedHit or applyStatus. */
+  private fireBossSignature(boss: EngineEntity): void {
+    const bs = boss.bossSignature;
+    if (!bs) return;
+    bs.windingUp = false;
+    bs.cooldownMs = bs.def.cooldownMs;
+
+    for (const action of bs.def.actions) {
+      switch (action.type) {
+        case 'buffedHit': {
+          const mult = action.damageMult ?? 1.5;
+          this.resolveHit(boss, this.hero, { mult, action: bs.def.name });
+          if (this.phase !== 'fighting') return;
+          break;
+        }
+        case 'applyStatus': {
+          const statusId = action.statusId;
+          if (!statusId) continue;
+          const target = action.target === 'self' ? boss : this.hero;
+          this.applyStatusTo(boss, target, {
+            id: statusId,
+            magnitude: action.magnitude,
+            durationMs: action.durationMs,
+          }, bs.def.name, action.target === 'self', 0);
+          break;
         }
       }
     }

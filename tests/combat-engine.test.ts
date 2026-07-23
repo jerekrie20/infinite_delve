@@ -163,3 +163,50 @@ await check('extract-at policy banks; push-until-death dies', () => {
   const pushed = runSim({ seed: 8, level: 1 });
   assert.equal(pushed.outcome, 'died');
 });
+
+// ── Phase 2: boss signature moves (D39) ───────────────────────────────
+
+await check('boss signatures: wind-up emitted, then signature fires at depth 10', () => {
+  // Run a hero that can survive the Goblin Chieftain (depth 10 boss).
+  const sim = runSim({ seed: 123, level: 30, extractAt: 12 });
+  const windUps = sim.events.filter((e) => e.type === 'bossWindUp');
+  assert.ok(windUps.length >= 1, 'bossWindUp event must fire at least once');
+
+  // The Chieftain's signature is War Cry (self-Rage).
+  const warCry = windUps.find((e) => e.type === 'bossWindUp' && e.signatureName === 'War Cry');
+  assert.ok(warCry !== undefined, 'War Cry wind-up must appear');
+
+  // After the wind-up, the Rage status should be applied (on the boss).
+  const rageApplied = sim.events.find(
+    (e) => e.type === 'statusApplied' && e.statusId === 'rage'
+  );
+  assert.ok(rageApplied !== undefined, 'Rage must be applied after War Cry fires');
+});
+
+await check('boss signatures: first firing respects ≥5s delay', () => {
+  const sim = runSim({ seed: 456, level: 30, extractAt: 12 });
+  const floorStart = sim.events.findIndex((e) => e.type === 'floorStart' && e.depth === 10);
+  const windUp = sim.events.findIndex((e) => e.type === 'bossWindUp');
+  assert.ok(floorStart >= 0, 'floor 10 must exist');
+  assert.ok(windUp > floorStart, 'wind-up must be after floor start');
+
+  // Count events between floorStart and windUp to estimate time. Each hit event
+  // takes ~2s (one attack beat). With a 5s firstDelayMs, there should be at
+  // least 1 hit event between floor start and wind-up.
+  const between = sim.events.slice(floorStart + 1, windUp).filter((e) => e.type === 'hit');
+  assert.ok(between.length >= 1, `boss should attack at least once before signature (got ${between.length} hits)`);
+});
+
+await check('boss signatures: Necromancer Curse of the Grave curses the hero', () => {
+  // Necromancer at depth 20 — signature applies Curse (healing taken −50%).
+  const sim = runSim({ seed: 789, level: 40, extractAt: 22 });
+  const curseWindUp = sim.events.find(
+    (e) => e.type === 'bossWindUp' && e.signatureName === 'Curse of the Grave'
+  );
+  assert.ok(curseWindUp !== undefined, 'Curse of the Grave wind-up must appear');
+
+  const curseApplied = sim.events.find(
+    (e) => e.type === 'statusApplied' && e.statusId === 'curse'
+  );
+  assert.ok(curseApplied !== undefined, 'Curse must be applied to the hero');
+});

@@ -8,7 +8,7 @@ import type { MonsterRarity } from './delve';
 import { TUNING } from './content/tuning';
 import {
   TEMPLATES, templatesForDepth, bossForDepth, isMiniBossDepth, templateIntervalMs,
-  type MonsterKind, type MonsterTemplate,
+  type BossSignature, type MonsterKind, type MonsterTemplate,
 } from './content/monsters';
 import { rollFromPool } from './content/passives';
 import type { GearStats } from './delve';
@@ -45,6 +45,8 @@ export interface WaveMonster {
   row: 'front' | 'back';
   /** Base attack interval in ms (kind default or template override). */
   intervalMs: number;
+  /** Boss signature (absent for non-bosses). Carried through to the engine. */
+  signature?: BossSignature;
 }
 
 /** Engine-facing alias: what packForDepth emits. */
@@ -88,6 +90,7 @@ function scaledMonster(
     : rarity === 'elite' ? `Elite ${tpl.name}`
     : tpl.name;
 
+  const sig = rarity === 'boss' ? tpl.signature : undefined;
   return {
     kind: tpl.kind,
     hp: Math.max(1, Math.round((m.baseHp + m.hpPerDepth * d) * tpl.statMult * hpMult * share * compoundHp)),
@@ -102,6 +105,7 @@ function scaledMonster(
     passives,
     row: tpl.kind === 'caster' || tpl.kind === 'support' ? 'back' : 'front',
     intervalMs: templateIntervalMs(tpl),
+    ...(sig ? { signature: sig } : {}),
   };
 }
 
