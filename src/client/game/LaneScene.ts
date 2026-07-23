@@ -100,6 +100,7 @@ export class LaneScene extends Phaser.Scene {
   private bars!: Phaser.GameObjects.Graphics;
   private heroStatusText!: Phaser.GameObjects.Text;
   private choiceGroup!: Phaser.GameObjects.Container;
+  private fleeButton!: Phaser.GameObjects.Text;
 
   /** Enable verbose combat logging in the browser console. Activate with ?debug=1
    *  in the URL, or set localStorage['delve_debug'] = '1'. */
@@ -165,6 +166,7 @@ export class LaneScene extends Phaser.Scene {
       .setShadow(0, 2, '#000000', 3);
 
     this.buildChoiceUI();
+    this.buildFleeButton();
 
     // The engine buffered its first floorStart during construction — a zero-
     // advance step drains it so the opening pack renders.
@@ -230,7 +232,15 @@ export class LaneScene extends Phaser.Scene {
           break;
         }
         case 'lootDrop': this.dropToast(e.item); break;
-        case 'floorCleared': this.showChoice(); break;
+        case 'floorCleared':
+          // Choice pacing (D3/D33): pause only at every 5th depth
+          // (mini-boss/boss floors). Auto-continue between.
+          if (isPauseDepth(e.nextDepth)) {
+            this.showChoice();
+          } else {
+            this.time.delayedCall(400, () => this.doContinue());
+          }
+          break;
         case 'runEnded':
           if (e.outcome === 'died') this.onDied(e.depthCleared);
           else void this.finishExtract(e.depthCleared, e.runGold, e.haul);
@@ -506,6 +516,35 @@ export class LaneScene extends Phaser.Scene {
     this.choiceGroup.setVisible(false);
   }
 
+  /** Small always-visible flee button (D33: flee between fights only). */
+  private buildFleeButton(): void {
+    this.fleeButton = this.add
+      .text(DESIGN_W - 20, 20, '⚡ Flee', {
+        fontFamily: 'Arial', fontSize: '22px', color: '#ffb020',
+        fontStyle: 'bold',
+      })
+      .setOrigin(1, 0)
+      .setShadow(0, 2, '#000000', 3)
+      .setAlpha(0.4)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(50);
+    this.fleeButton.on('pointerdown', () => {
+      if (this.engine.snapshot().phase === 'choosing') {
+        this.doExtract();
+      }
+    });
+    this.fleeButton.on('pointerover', () => {
+      if (this.engine.snapshot().phase === 'choosing') {
+        this.fleeButton.setAlpha(1);
+      }
+    });
+    this.fleeButton.on('pointerout', () => {
+      if (this.engine.snapshot().phase !== 'over') {
+        this.fleeButton.setAlpha(this.engine.snapshot().phase === 'choosing' ? 0.8 : 0.4);
+      }
+    });
+  }
+
   private doContinue(): void {
     this.hideChoice();
     const next = this.engine.snapshot().depth + 1;
@@ -546,6 +585,10 @@ export class LaneScene extends Phaser.Scene {
     this.hero.hp = this.snap.hero.hp;
     this.drawBars();
     this.drawStatuses();
+    // Flee button: active between fights, dim during combat.
+    if (this.fleeButton) {
+      this.fleeButton.setAlpha(this.snap.phase === 'choosing' ? 0.8 : 0.4);
+    }
     this.sys.game.events.emit('hud-changed', {
       depth: this.snap.depth,
       bankedGold: this.bankedGold,
@@ -700,6 +743,14 @@ function statusLine(statuses: Array<{ id: string; stacks: number }>): string {
     });
   const shown = icons.slice(0, 6).join(' ');
   return icons.length > 6 ? `${shown} +${icons.length - 6}` : shown;
+}
+
+// ---- Choice pacing (D3/D33) --------------------------------------------------
+
+/** True at every 5th depth (mini-boss / boss checkpoint floors) — these are
+ *  the only floors where the player makes a Continue/Extract choice. */
+function isPauseDepth(depth: number): boolean {
+  return depth % 5 === 0;
 }
 
 // ---- Checkpoint picker (D4) -------------------------------------------------
