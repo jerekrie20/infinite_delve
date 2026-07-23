@@ -136,17 +136,19 @@ export function bankHaul(h: StoredHero, haul: GearItem[]): number {
   return equippedCount;
 }
 
-/** Unlock the checkpoint AFTER a boss depth if not already owned (D4):
- *  felling the boss at depth 10k unlocks start-at depth 10k+1. */
+/** Unlock every checkpoint up to the reached depth (D4, core-run.md):
+ *  felling the boss at depth 10k unlocks start-at depth 10k+1.
+ *  A run that reaches depth 20 unlocks 11 (boss 10) AND 21 (boss 20) —
+ *  you killed both bosses on the way down. */
 export function unlockCheckpoint(h: StoredHero, depthReached: number): void {
-  const bossDepth = Math.floor(depthReached / 10) * 10;
-  if (bossDepth < 10) return; // no checkpoint before depth 10
-  const start = bossDepth + 1;
   if (!h.checkpoints) h.checkpoints = [1];
-  if (!h.checkpoints.includes(start)) {
-    h.checkpoints.push(start);
-    h.checkpoints.sort((a, b) => a - b);
+  for (let bossDepth = 10; bossDepth <= depthReached; bossDepth += 10) {
+    const start = bossDepth + 1;
+    if (!h.checkpoints.includes(start)) {
+      h.checkpoints.push(start);
+    }
   }
+  h.checkpoints.sort((a, b) => a - b);
 }
 
 /** Bank the outcome of an active run. Extract → award reward for depths cleared,

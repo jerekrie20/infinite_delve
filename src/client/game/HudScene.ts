@@ -22,6 +22,8 @@ export interface HudSnapshot {
   cooldowns?: Record<string, number>;
   /** Recent hits for the summary tab (per-entity timers — no exchanges). */
   recentHits?: RecentHit[];
+  /** Live boss name on boss floors — shown under the depth text (D31). */
+  bossName?: string;
 }
 
 /** The main-page HUD rendered as Phaser canvas objects, skinned with the wooden
@@ -61,6 +63,7 @@ export class HudScene extends Phaser.Scene {
   private maxHp = 40;
 
   private depthText!: Phaser.GameObjects.Text;
+  private bossNameText!: Phaser.GameObjects.Text;
   private moneyText!: Phaser.GameObjects.Text;
   private barGfx!: Phaser.GameObjects.Graphics;
   private tabSkills!: Phaser.GameObjects.NineSlice;
@@ -175,6 +178,8 @@ export class HudScene extends Phaser.Scene {
     this.icon('iconMenu', 744, 54, 60)?.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.hooks.openMenu());
     this.label(400, 40, 'THE DELVE', 18, '#c9b8ff', 'center');
     this.depthText = this.label(400, 70, 'Depth 1', 30, '#ffffff', 'center');
+    // Boss name/title under the map detail — empty except on boss floors.
+    this.bossNameText = this.label(400, 112, '', 24, '#ffb020', 'center');
   }
 
   private buildPanel(): void {
@@ -418,6 +423,7 @@ export class HudScene extends Phaser.Scene {
     this.cooldowns = s.cooldowns ?? {};
     this.recentHits = s.recentHits ?? [];
     this.depthText.setText(`Depth ${s.depth}`);
+    this.bossNameText.setText(s.bossName ? `☠ ${s.bossName} ☠` : '');
     this.moneyText.setText(formatShort(s.bankedGold));
     if (s.haulCount > 0) { this.bagBadge.setVisible(true); this.bagBadgeText.setText(String(s.haulCount)); }
     else this.bagBadge.setVisible(false);
