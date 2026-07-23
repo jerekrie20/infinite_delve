@@ -117,7 +117,7 @@ export class LaneScene extends Phaser.Scene {
       attack: 6, defense: 5, critChance: TUNING.combat.critChance * 100,
       critMultiplier: TUNING.combat.critMultiplier, lifesteal: 0, dodge: 0,
       hpRegen: 0, goldFind: 0, mana: 50, maxMana: 50, abilities: ['slam'],
-      gold: 0, bestDepth: 1, stash: [], equipped: {},
+      gold: 0, bestDepth: 1, checkpoints: [1], stash: [], equipped: {},
     };
     if (data.idle) this.pendingIdle = data.idle;
     this.bankedGold = this.hero.gold;
@@ -126,10 +126,11 @@ export class LaneScene extends Phaser.Scene {
     this.startEngine();
   }
 
-  /** Fresh engine = fresh run: new runId, seed derived from it, depth 1.
-   *  Reloads the rotation order from the hero's current abilities so newly
-   *  unlocked actives (e.g. Fortify at level 5) are included immediately. */
-  private startEngine(): void {
+  /** Fresh engine = fresh run: new runId, seed derived from it, at the chosen
+   *  checkpoint depth (D4). Reloads the rotation order from the hero's current
+   *  abilities so newly unlocked actives (e.g. Fortify at level 5) are included
+   *  immediately. */
+  private startEngine(startDepth = 1): void {
     this.runId = newRunId();
     this.rotationOrder = loadRotationOrder(localStorage, this.hero.abilities);
     this.engine = new CombatEngine({
@@ -137,6 +138,7 @@ export class LaneScene extends Phaser.Scene {
       derived: this.heroDerived,
       seed: seedFromString(this.runId),
       rotationOrder: this.rotationOrder,
+      startDepth,
     });
     this.snap = this.engine.snapshot();
   }
@@ -339,10 +341,6 @@ export class LaneScene extends Phaser.Scene {
   private onDied(reached: number): void {
     this.over = true;
     const runId = this.runId; // capture — resetRun rotates it before the post may settle
-    // Depth reached still counts toward "deepest delve today" — record it, then
-    // let the Daily panel repaint once the server write lands. A retryable
-    // failure (offline, or a fast death hitting the 1/30s limit) is queued so
-    // the depth still reaches the board later.
     void postRunResult('died', reached, [], runId).then((result) => {
       if (result.status === 'retryable') {
         enqueueRun(localStorage, {
@@ -356,14 +354,25 @@ export class LaneScene extends Phaser.Scene {
       this.sys.game.events.emit('run-resolved', { outcome: 'died', reached });
     });
     this.banner('DIED', '#ff5470');
-    this.time.delayedCall(1500, () => this.resetRun());
+    // After death, show checkpoint picker (D4): the player picks where to restart.
+    this.time.delayedCall(2000, () => this.pickCheckpointAndRestart());
   }
 
-  private resetRun(): void {
+  /** Show the checkpoint picker, then restart the run at the chosen depth (D4). */
+  private pickCheckpointAndRestart(): void {
+    const checkpoints = this.hero.checkpoints ?? [1];
+    if (checkpoints.length <= 1) {
+      this.resetRun(1);
+      return;
+    }
+    showCheckpointPicker(checkpoints, (depth) => this.resetRun(depth));
+  }
+
+  private resetRun(startDepth = 1): void {
     this.over = false;
     this.choiceGroup.setVisible(false);
     this.hero.mana = this.hero.maxMana; // mana resets each run
-    this.startEngine();
+    this.startEngine(startDepth);
     this.handleEvents(this.engine.step(0));
     this.sys.game.events.emit('run-reset');
     this.refreshHud();
@@ -691,4 +700,41 @@ function statusLine(statuses: Array<{ id: string; stacks: number }>): string {
     });
   const shown = icons.slice(0, 6).join(' ');
   return icons.length > 6 ? `${shown} +${icons.length - 6}` : shown;
+}
+
+// ---- Checkpoint picker (D4) -------------------------------------------------
+
+/** Boss depth → theme name map for the picker labels. */
+const BOSS_THEMES: Record<number, string> = {
+  10: 'Goblin Chieftain · Goblin Camp',
+  20: 'Necromancer · Crypt',
+  30: 'Broodmother · Warrens',
+  40: 'The Hollow King · Deep',
+  50: 'Pyre Tyrant · Volcanic',
+  60: 'Herald of the Abyss · Abyss',
+};
+
+/** Populate the #checkpoint-panel with a button per unlocked checkpoint, then
+ *  show it. On tap, hide and call `callback(depth)`. */
+function showCheckpointPicker(checkpoints: number[], callback: (depth: number) => void): void {
+  const panel = document.getElementById('checkpoint-panel');
+  const list = document.getElementById('checkpoint-list');
+  if (!panel || !list) { callback(1); return; }
+
+  list.innerHTML = '';
+  for (const depth of checkpoints) {
+    const btn = document.createElement('button');
+    btn.className = 'menu-item';
+    const theme = BOSS_THEMES[depth - 1];
+    btn.textContent = theme
+      ? `Depth ${depth} — after ${theme}`
+      : `Depth ${depth} (fresh start)`;
+    btn.addEventListener('click', () => {
+      panel.style.display = 'none';
+      callback(depth);
+    });
+    list.appendChild(btn);
+  }
+
+  panel.style.display = 'flex';
 }

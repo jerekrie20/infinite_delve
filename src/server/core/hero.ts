@@ -73,6 +73,7 @@ export function toHero(h: StoredHero): Hero {
     bestDepth: h.bestDepth,
     stash: h.stash,
     equipped: h.equipped,
+    checkpoints: h.checkpoints ?? [1],
   };
 }
 
@@ -135,9 +136,22 @@ export function bankHaul(h: StoredHero, haul: GearItem[]): number {
   return equippedCount;
 }
 
+/** Unlock the checkpoint AFTER a boss depth if not already owned (D4):
+ *  felling the boss at depth 10k unlocks start-at depth 10k+1. */
+export function unlockCheckpoint(h: StoredHero, depthReached: number): void {
+  const bossDepth = Math.floor(depthReached / 10) * 10;
+  if (bossDepth < 10) return; // no checkpoint before depth 10
+  const start = bossDepth + 1;
+  if (!h.checkpoints) h.checkpoints = [1];
+  if (!h.checkpoints.includes(start)) {
+    h.checkpoints.push(start);
+    h.checkpoints.sort((a, b) => a - b);
+  }
+}
+
 /** Bank the outcome of an active run. Extract → award reward for depths cleared,
- *  bank the gear haul (auto-equip better), raise bestDepth. Death → nothing
- *  banked (the haul is the stake), bestDepth unchanged, revive. */
+ *  bank the gear haul (auto-equip better), raise bestDepth, unlock checkpoint.
+ *  Death → nothing banked (the haul is the stake), bestDepth unchanged, revive. */
 export function applyRun(
   h: StoredHero,
   outcome: RunOutcome,
@@ -146,6 +160,10 @@ export function applyRun(
 ): RunGained {
   const depth = Math.max(0, Math.floor(depthReached));
   h.lastSeenAt = Date.now();
+
+  // Checkpoint unlock: felling a boss at 10/20/30… unlocks start-at depth+1
+  // regardless of outcome (you killed the boss to reach past its depth).
+  unlockCheckpoint(h, depth);
 
   if (outcome !== 'extracted') {
     h.hp = h.maxHp; // hero persists; the unbanked haul is the stake

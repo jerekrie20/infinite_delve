@@ -11,13 +11,33 @@ import { classDef } from '../../shared/content/classes';
 
 /** Current write version. Bump WITH a new MIGRATIONS step + a fixture test +
  *  the DATA_SCHEMA.md ledger row — never alone. */
-export const STORED_HERO_VERSION = 2;
+export const STORED_HERO_VERSION = 3;
+
+// ---- StoredClass (per-class state, v3+) -------------------------------------
+
+/** Per-class progression + loadout. In v3+, equipped moves from top-level to
+ *  per-class; checkpoints live at account level. */
+export interface StoredClass {
+  level: number;
+  xp: number;
+  /** Promotion stage: 0 base / 1 promoted / 2 final (D9). */
+  stage: number;
+  /** Slot→abilityId loadout (D24). */
+  loadout: Record<number, string>;
+  /** Slots 2-5 in priority order (D30). Client-local until Phase 4. */
+  rotation: number[];
+  /** Ability ids beyond defaults unlocked for this class. */
+  optionsUnlocked: string[];
+  /** Per-class paper-doll (D8). */
+  equipped: Partial<Record<GearSlot, GearItem>>;
+}
 
 /** Persisted subset (Redis `hero:{userId}`). Derived combat stats are
  *  recomputed on read, never stored. */
 export interface StoredHero {
   /** Schema version this blob was written at (see DATA_SCHEMA.md ledger). */
   v: number;
+  // ── v2 fields ──────────────────────────────────────────────────────
   class: HeroClass;
   level: number;
   xp: number;
@@ -30,6 +50,28 @@ export interface StoredHero {
   lastSeenAt: number;
   stash: GearItem[];
   equipped: Partial<Record<GearSlot, GearItem>>;
+  // ── v3 fields (D4, D8, D10, D18, D43, D44) ────────────────────────
+  /** Unlocked start depths (D4). Always contains at least [1]. */
+  checkpoints: number[];
+  /** Automation tiers purchased (D18). */
+  automation: {
+    tiers: number;
+    autoContinueToDepth?: number;
+    autoCastOn?: boolean;
+    autoExtract?: { depth?: number; hpPct?: number };
+  };
+  /** Class id currently active (D8). */
+  activeClass: string;
+  /** Per-class progression + loadouts. At minimum contains the active class. */
+  classes: Record<string, StoredClass>;
+  /** Mastered chain-node ids (D10), e.g. ['knight']. */
+  masteries: string[];
+  /** Stash page count (D43). */
+  stashPages: number;
+  /** Owned cosmetic ids (D43). */
+  cosmetics: string[];
+  /** Per-rarity essence counters for salvage crafting (D44). */
+  essences: number[];
 }
 
 export function newStoredHero(nowMs: number): StoredHero {
@@ -46,6 +88,24 @@ export function newStoredHero(nowMs: number): StoredHero {
     lastSeenAt: nowMs,
     stash: [],
     equipped: {},
+    checkpoints: [1],
+    automation: { tiers: 0 },
+    activeClass: 'squire',
+    classes: {
+      squire: {
+        level: 1,
+        xp: 0,
+        stage: 0,
+        loadout: { 1: 'slam', 2: 'fortify' },
+        rotation: [],
+        optionsUnlocked: ['fortify'],
+        equipped: {},
+      },
+    },
+    masteries: [],
+    stashPages: 1,
+    cosmetics: [],
+    essences: [0, 0, 0, 0, 0],
   };
 }
 
@@ -121,9 +181,44 @@ const migrateV1toV2: MigrationStep = (blob, nowMs) => {
   return out;
 };
 
+/** v2 → v3: add Phase 2 fields (checkpoints, automation, per-class state,
+ *  masteries, essences). Equipped + level/xp are COPIED into the squire
+ *  StoredClass; top-level fields are retained for backward compat. */
+const migrateV2toV3: MigrationStep = (blob, _nowMs) => {
+  const out = { ...blob };
+  // Account-wide progression.
+  if (!Array.isArray(out.checkpoints)) out.checkpoints = [1];
+  if (!out.automation || typeof out.automation !== 'object') {
+    out.automation = { tiers: 0 };
+  }
+  if (typeof out.activeClass !== 'string') out.activeClass = (out.class as string) ?? 'squire';
+  if (!out.classes || typeof out.classes !== 'object') {
+    const level = typeof out.level === 'number' ? out.level : 1;
+    const xp = typeof out.xp === 'number' ? out.xp : 0;
+    const equipped = (out.equipped as Record<string, unknown>) ?? {};
+    out.classes = {
+      squire: {
+        level,
+        xp,
+        stage: 0,
+        loadout: { 1: 'slam', 2: 'fortify' },
+        rotation: [],
+        optionsUnlocked: ['fortify'],
+        equipped,
+      },
+    };
+  }
+  if (!Array.isArray(out.masteries)) out.masteries = [];
+  if (typeof out.stashPages !== 'number') out.stashPages = 1;
+  if (!Array.isArray(out.cosmetics)) out.cosmetics = [];
+  if (!Array.isArray(out.essences)) out.essences = [0, 0, 0, 0, 0];
+  return out;
+};
+
 /** Keyed by the version a step migrates FROM (vN → vN+1). */
 const MIGRATIONS: Record<number, MigrationStep> = {
   1: migrateV1toV2,
+  2: migrateV2toV3,
 };
 
 /** Bring a parsed `hero:{userId}` blob up to STORED_HERO_VERSION. Spread-copies

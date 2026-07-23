@@ -32,6 +32,7 @@ const MOCK_HERO: Hero = {
   abilities: ['slam'],
   gold: 0,
   bestDepth: 1,
+  checkpoints: [1],
   stash: [],
   equipped: {},
 };

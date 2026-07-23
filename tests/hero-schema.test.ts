@@ -109,3 +109,77 @@ await check('resetStoredHero is replay-safe: ignores input, same nowMs → same 
   resetStoredHero(b, NOW);
   assert.deepEqual(a, b);
 });
+
+// ── Phase 2: v2 → v3 migration + checkpoints ──────────────────────────
+
+/** A real v2 hero blob (current production shape, from before the v3 bump). */
+const V2_FIXTURE = {
+  v: 2,
+  class: 'squire',
+  level: 12,
+  xp: 340,
+  hp: 128,
+  maxHp: 128,
+  gold: 5500,
+  bestDepth: 15,
+  lastSeenAt: NOW - 86400000, // 1 day ago
+  stash: [
+    { id: 'itm_a', slot: 'hand1', r: 'rare', base: 'blade', s: { attack: 15 } },
+  ],
+  equipped: {
+    hand1: { id: 'itm_a', slot: 'hand1', r: 'rare', base: 'blade', s: { attack: 15 } },
+    body: { id: 'itm_b', slot: 'body', r: 'uncommon', base: 'armor', s: { maxHp: 22 } },
+  },
+  futureFlag: 'keep me',
+};
+
+await check('v2 fixture migrates to v3 with checkpoints and per-class state', () => {
+  const h = migrateStoredHero({ ...V2_FIXTURE }, NOW);
+  assert.equal(h.v, 3);
+  // Existing v2 fields preserved.
+  assert.equal(h.class, 'squire');
+  assert.equal(h.level, 12);
+  assert.equal(h.gold, 5500);
+  assert.equal(h.bestDepth, 15);
+  // New v3 fields.
+  assert.deepEqual(h.checkpoints, [1]);
+  assert.deepEqual(h.automation, { tiers: 0 });
+  assert.equal(h.activeClass, 'squire');
+  assert.ok(h.classes?.squire, 'squire class entry must exist');
+  assert.equal(h.classes.squire.level, 12);
+  assert.equal(h.classes.squire.xp, 340);
+  assert.equal(h.classes.squire.stage, 0);
+  assert.equal(h.classes.squire.equipped.hand1?.id, 'itm_a');
+  assert.equal(h.classes.squire.equipped.body?.id, 'itm_b');
+  assert.deepEqual(h.classes.squire.rotation, []);
+  assert.deepEqual(h.masteries, []);
+  assert.equal(h.stashPages, 1);
+  assert.deepEqual(h.cosmetics, []);
+  assert.deepEqual(h.essences, [0, 0, 0, 0, 0]);
+  // Forward compat preserved.
+  assert.equal((h as unknown as Record<string, unknown>).futureFlag, 'keep me');
+});
+
+await check('v2→v3 migration is idempotent', () => {
+  const once = migrateStoredHero({ ...V2_FIXTURE }, NOW);
+  const twice = migrateStoredHero(JSON.parse(JSON.stringify(once)), NOW);
+  assert.deepEqual(twice, once);
+});
+
+await check('newStoredHero v3 has checkpoints starting at [1]', () => {
+  const h = newStoredHero(NOW);
+  assert.equal(h.v, 3);
+  assert.deepEqual(h.checkpoints, [1]);
+  assert.ok(h.classes.squire?.loadout[1] === 'slam');
+  assert.ok(h.classes.squire?.loadout[2] === 'fortify');
+});
+
+await check('newStoredHero: reset drops to v3 shape, not v2', () => {
+  const h = newStoredHero(NOW);
+  h.checkpoints = [1, 11, 21];
+  h.gold = 99;
+  resetStoredHero(h, NOW);
+  assert.equal(h.v, 3);
+  assert.deepEqual(h.checkpoints, [1]); // reset wipes progress
+  assert.equal(h.gold, 0);
+});

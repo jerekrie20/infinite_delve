@@ -86,6 +86,8 @@ export interface Hero {
   gold: number;
   /** Deepest depth ever banked (via extract). Drives the idle income rate. */
   bestDepth: number;
+  /** Unlocked start depths (D4). Always contains at least [1]. */
+  checkpoints: number[];
   stash: GearItem[];
   equipped: Partial<Record<GearSlot, GearItem>>;
 }

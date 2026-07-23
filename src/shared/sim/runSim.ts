@@ -70,7 +70,7 @@ export function simHero(level: number, equipped: Partial<Record<GearSlot, GearIt
     hpRegen: derived.hpRegen, goldFind: derived.goldFindPct,
     mana: maxMana, maxMana,
     abilities: unlockedAbilities(cls.id, level),
-    gold: 0, bestDepth: 1, stash: [], equipped,
+    gold: 0, bestDepth: 1, checkpoints: [1], stash: [], equipped,
   };
   return { hero, derived };
 }
