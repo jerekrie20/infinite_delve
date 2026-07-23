@@ -12,11 +12,13 @@ export interface RateLimitRedisLike {
 }
 
 /** Per-endpoint limits, mirroring SECURITY_PERF ("run/result ≤1 per 30s ⚙,
- *  equip/sell ≤5/s"). Hero read stays unlimited ("hero read cheap"). */
+ *  equip/sell ≤5/s, hero/reset ≤1 per 10s ⚙"). Hero read stays unlimited
+ *  ("hero read cheap"). */
 export const RATE_LIMITS = {
   runResult: { limit: 1, windowSeconds: 30 },
   equip: { limit: 5, windowSeconds: 1 },
   sell: { limit: 5, windowSeconds: 1 },
+  reset: { limit: 1, windowSeconds: 10 },
 } as const;
 
 const rateLimitKey = (bucket: string, userId: string, window: number): string =>

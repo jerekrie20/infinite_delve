@@ -35,3 +35,12 @@ export function saveRotationOrder(storage: StorageLike, order: string[]): void {
     // Quota/read-only storage — the order still applies for this session.
   }
 }
+
+/** Drop the saved order (hero factory reset — back to slot-order default). */
+export function clearRotationOrder(storage: StorageLike): void {
+  try {
+    storage.removeItem(ROTATION_KEY);
+  } catch {
+    // Read-only storage — nothing to clear.
+  }
+}

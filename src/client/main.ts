@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { showToast } from '@devvit/web/client';
 import { LaneScene } from './game/LaneScene';
 import { HudScene, type HudHooks } from './game/HudScene';
-import { fetchHero, postRunResult } from './api';
-import { flushQueue } from './runQueue';
+import { fetchHero, postResetHero, postRunResult } from './api';
+import { clearQueue, flushQueue } from './runQueue';
+import { clearRotationOrder } from './rotation';
 import { initDailyPanel, refreshDailyPanel } from './ui/daily';
 import { initGearPanel, openGearPanel } from './ui/gear';
 
@@ -76,6 +77,41 @@ async function boot(): Promise<void> {
   document
     .getElementById('btn-daily')
     ?.addEventListener('click', () => document.getElementById('menu-panel')?.classList.remove('show'));
+
+  // Factory reset (menu → 🗑️): two-tap confirm (no alert/confirm in the Devvit
+  // iframe), then server reset → clear device-local state → restart both
+  // scenes with the fresh hero. Never fake a reset locally — the server copy
+  // would win at next load.
+  const resetButton = document.getElementById('btn-reset');
+  const resetLabel = resetButton?.textContent ?? '';
+  let resetArmed = false;
+  const disarmReset = (): void => {
+    resetArmed = false;
+    if (resetButton) resetButton.textContent = resetLabel;
+  };
+  resetButton?.addEventListener('click', () => {
+    if (!resetArmed) {
+      resetArmed = true;
+      resetButton.textContent = '⚠️ Tap again to erase EVERYTHING';
+      setTimeout(disarmReset, 4000);
+      return;
+    }
+    disarmReset();
+    void (async () => {
+      const resp = await postResetHero();
+      if (!resp) {
+        showToast('Reset failed — try again');
+        return;
+      }
+      clearQueue(localStorage);       // old hero's pending runs must not re-award
+      clearRotationOrder(localStorage);
+      document.getElementById('menu-panel')?.classList.remove('show');
+      game.scene.getScene('LaneScene')?.scene.restart({ hero: resp.hero });
+      game.scene.getScene('HudScene')?.scene.restart({ hooks, hero: resp.hero });
+      game.events.emit('hero-changed', resp.hero);
+      showToast('Fresh start — back to Depth 1');
+    })();
+  });
 
   // Daily meta panel: wire the DAILY entry, and repaint the board/frontier each
   // time a run resolves (the server records it in the run-result flow).

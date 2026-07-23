@@ -49,6 +49,18 @@ export function newStoredHero(nowMs: number): StoredHero {
   };
 }
 
+/** FACTORY RESET, in place — the self-service "start fresh" (SECURITY_PERF).
+ *  Unlike migration, unknown fields do NOT survive: the player asked for a
+ *  clean slate, so every key is dropped before the fresh hero is written in.
+ *  Pure + replay-safe (ignores the input entirely) — valid as an updateHero
+ *  mutator. The Record cast is the delete-unknown-keys boundary, same class
+ *  of exception as the sanitize cast. */
+export function resetStoredHero(hero: StoredHero, nowMs: number): void {
+  const blob = hero as unknown as Record<string, unknown>;
+  for (const key of Object.keys(blob)) delete blob[key];
+  Object.assign(hero, newStoredHero(nowMs));
+}
+
 // ---- GearItem migration: old keys → lean keys (part of v1 → v2) -------------
 
 /** Migrate a single item from the old stored shape (`name`, `rarity`, `stats`)

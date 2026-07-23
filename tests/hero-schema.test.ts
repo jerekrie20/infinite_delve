@@ -7,6 +7,7 @@ import {
   STORED_HERO_VERSION,
   migrateStoredHero,
   newStoredHero,
+  resetStoredHero,
 } from '../src/server/core/heroSchema';
 
 describe('hero-schema');
@@ -78,4 +79,33 @@ await check('newStoredHero writes the current version and a full-health squire',
   assert.equal(h.hp, h.maxHp);
   assert.equal(h.maxHp, 40);
   assert.equal(h.lastSeenAt, NOW);
+});
+
+await check('resetStoredHero: a leveled, geared hero becomes a fresh L1 squire', () => {
+  const h = newStoredHero(NOW - 9999);
+  h.level = 30;
+  h.xp = 5000;
+  h.gold = 123456;
+  h.bestDepth = 42;
+  h.stash = [{ id: 'itm_x', slot: 'hand1', r: 'epic', base: 'blade', s: { attack: 20 } }];
+  h.equipped = { head: { id: 'itm_y', slot: 'head', r: 'rare', base: 'helm', s: { maxHp: 9 } } };
+  resetStoredHero(h, NOW);
+  assert.deepEqual(h, newStoredHero(NOW));
+});
+
+await check('resetStoredHero drops unknown fields (clean slate, unlike migration)', () => {
+  const h = newStoredHero(NOW);
+  (h as unknown as Record<string, unknown>).legacyExperiment = { big: true };
+  resetStoredHero(h, NOW);
+  assert.equal('legacyExperiment' in h, false);
+});
+
+await check('resetStoredHero is replay-safe: ignores input, same nowMs → same hero', () => {
+  const a = newStoredHero(NOW);
+  a.gold = 777;
+  resetStoredHero(a, NOW);
+  const b = newStoredHero(NOW);
+  b.level = 50;
+  resetStoredHero(b, NOW);
+  assert.deepEqual(a, b);
 });

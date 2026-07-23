@@ -23,9 +23,12 @@ value, client owns feel; determinism is the anti-cheat.**
 ## Attack surface checklist (standing)
 
 - Rate limits: run/result ≤1 per 30s ⚙, equip/sell/craft ≤5/s, hero read
-  cheap; per-user, in Redis counters (`core/rateLimit.ts`, fixed-window —
-  exists, Phase 0). A 429'd honest run is NOT lost: the client queues +
-  retries it with the same `runId`
+  cheap, hero/reset ≤1 per 10s ⚙; per-user, in Redis counters
+  (`core/rateLimit.ts`, fixed-window — exists, Phase 0). A 429'd honest run
+  is NOT lost: the client queues + retries it with the same `runId`
+- Self-service factory reset (`/api/hero/reset`): destroys ONLY the caller's
+  own `hero:{userId}` blob (no meta keys, no boards) — no trust issue, a
+  player can only zero their own value; two-tap confirm client-side
 - Run idempotency: `run/result` accepts a client `runId`; replays return the
   stored summary (`run:done:*` key, [[DATA_SCHEMA]]) without touching the
   limiter or re-awarding — this is what makes client retry safe

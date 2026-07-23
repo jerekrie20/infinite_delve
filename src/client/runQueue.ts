@@ -76,6 +76,12 @@ function writeQueue(storage: StorageLike, queue: PendingRun[]): void {
   }
 }
 
+/** Wipe the queue (hero factory reset — pending runs belong to the old hero;
+ *  re-posting them would re-award progress the player just chose to destroy). */
+export function clearQueue(storage: StorageLike): void {
+  writeQueue(storage, []);
+}
+
 /** Append a failed run; the oldest entries are dropped past MAX_QUEUE. */
 export function enqueueRun(storage: StorageLike, run: PendingRun): void {
   const queue = readQueue(storage, run.queuedAt);

@@ -124,6 +124,24 @@ export async function postSell(itemId: string): Promise<SellResponse | null> {
   }
 }
 
+/** Factory-reset the hero to a fresh L1 squire. Returns the fresh hero, or
+ *  null on failure — the caller must NOT fake a reset locally (the server
+ *  copy would still be the old hero and win at next load). */
+export async function postResetHero(): Promise<HeroResponse | null> {
+  try {
+    const res = await fetch('/api/hero/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as HeroResponse;
+  } catch (err) {
+    console.warn('[delve] /api/hero/reset failed', err);
+    return null;
+  }
+}
+
 /** How a run submission ended. 'retryable' (network down, 429 rate-limited,
  *  5xx) means the caller should QUEUE the run and re-post it later with the
  *  same runId — the server dedupes, so a retry never double-awards.

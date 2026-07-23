@@ -3,6 +3,7 @@
 //   POST /api/run/result  bank an active run (extract) or drop it (death)
 //   POST /api/equip       equip a stash item / unequip a slot
 //   POST /api/sell        sell a stash item for gold
+//   POST /api/hero/reset  factory-reset the CALLER'S hero (fresh L1 squire)
 //
 // The server owns all hero mutation and computes reward *values* from the
 // shared wave formula (src/shared/waves.ts); a claimed depth is plausibility-
@@ -30,6 +31,7 @@ import {
   collectIdle,
   equipItem,
   newStoredHero,
+  resetStoredHero,
   sellItem,
   toHero,
   unequipSlot,
@@ -75,6 +77,33 @@ game.post('/hero', async (c) => {
     if (isConflict(error)) return c.json<ErrorResponse>({ error: 'Busy — please retry' }, 409);
     console.error('POST /api/hero error:', error);
     return c.json<ErrorResponse>({ error: 'Failed to load hero' }, 500);
+  }
+});
+
+/** Factory reset — destroys ONLY the caller's own hero blob (no meta keys, no
+ *  boards; SECURITY_PERF: a player can only zero their own value). The client
+ *  double-confirms; the limiter stops accidental double-taps double-writing. */
+game.post('/hero/reset', async (c) => {
+  try {
+    const uid = playerId();
+    const nowMs = Date.now();
+
+    const rl = RATE_LIMITS.reset;
+    const allowed = await consumeRateLimit(redis, 'hero-reset', uid, rl.limit, rl.windowSeconds, nowMs);
+    if (!allowed) return c.json<ErrorResponse>({ error: 'Too fast — try again' }, 429);
+
+    const { hero } = await updateHero(
+      redis,
+      uid,
+      nowMs,
+      (h) => resetStoredHero(h, nowMs),
+      CAS_ATTEMPTS.hero
+    );
+    return c.json<HeroResponse>({ hero: toHero(hero) });
+  } catch (error) {
+    if (isConflict(error)) return c.json<ErrorResponse>({ error: 'Busy — please retry' }, 409);
+    console.error('POST /api/hero/reset error:', error);
+    return c.json<ErrorResponse>({ error: 'Failed to reset hero' }, 500);
   }
 });
 

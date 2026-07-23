@@ -22,7 +22,7 @@ import { unlockedAbilities } from '../../shared/content/actives';
 
 // The persisted shape + versioned migrations live in heroSchema.ts (pure,
 // fixture-tested). Re-exported so route/tool code has one import site.
-export { STORED_HERO_VERSION, migrateStoredHero, newStoredHero } from './heroSchema';
+export { STORED_HERO_VERSION, migrateStoredHero, newStoredHero, resetStoredHero } from './heroSchema';
 export type { StoredHero } from './heroSchema';
 
 export interface RunGained {
