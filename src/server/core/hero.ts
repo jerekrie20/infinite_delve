@@ -1,15 +1,16 @@
-// Hero persistence and progression for the idle looter. The canonical hero
-// lives in Redis under `hero:{userId}`. On app-open the server auto-collects
-// offline idle gains (since `lastSeenAt`); active runs are banked via applyRun.
-// Reward values are server-computed from the shared wave formula, so the client
-// is never trusted on amounts (v0 still trusts *depth reached*).
+// Hero progression logic for the idle looter — PURE (no Redis import, so tests
+// and tools can drive it directly). The canonical hero lives in Redis under
+// `hero:{userId}`; ALL I/O goes through heroStore.ts's `updateHero` CAS loop,
+// which hands these functions a loaded hero to mutate. On app-open the server
+// auto-collects offline idle gains (since `lastSeenAt`); active runs are
+// banked via applyRun. Reward values are server-computed from the shared wave
+// formula, so the client is never trusted on amounts.
 
-import { redis } from '@devvit/web/server';
-import type { GearItem, GearSlot, Hero, HeroClass, RunOutcome } from '../../shared/delve';
+import type { GearItem, GearSlot, Hero, RunOutcome } from '../../shared/delve';
 import { computeIdle, runReward, type IdleGains } from '../../shared/waves';
 import { TUNING } from '../../shared/content/tuning';
-import { classDef } from '../../shared/content/classes';
 import { sellValue } from '../../shared/content/items';
+import type { StoredHero } from './heroSchema';
 import {
   bankHaul as bankHaulState,
   deriveStats,
@@ -19,65 +20,10 @@ import {
 } from '../../shared/content/gear';
 import { unlockedAbilities } from '../../shared/content/actives';
 
-/** Persisted subset (Redis). Derived combat stats are recomputed on read. */
-export interface StoredHero {
-  class: HeroClass;
-  level: number;
-  xp: number;
-  hp: number;
-  maxHp: number;
-  gold: number;
-  /** Deepest depth ever banked; drives the idle rate. */
-  bestDepth: number;
-  /** Epoch ms of last interaction; offline idle accrues from here. */
-  lastSeenAt: number;
-  stash: GearItem[];
-  equipped: Partial<Record<GearSlot, GearItem>>;
-}
-
-// ---- GearItem migration: old keys → lean keys --------------------------------
-
-/** Migrate a single item from the old stored shape (`name`, `rarity`, `stats`)
- *  to the lean v2 shape (`r`, `s`, name rebuilt on read). Idempotent — items
- *  already in the new shape pass through unchanged. */
-function migrateItem(raw: Record<string, unknown>): GearItem | null {
-  if (!raw || typeof raw.id !== 'string' || typeof raw.slot !== 'string') return null;
-  // Old key `rarity` → new key `r`; new key wins if both present.
-  const r = (raw.r ?? raw.rarity ?? 'common') as GearItem['r'];
-  // Old key `stats` → new key `s`; new key wins if both present.
-  const s = (raw.s ?? raw.stats ?? {}) as GearItem['s'];
-  // Old stat `critChance` → `increasedCritPct` (crit rework: additive → PoE model).
-  // Old items with +crit become "+% increased crit chance" so they still work.
-  const so = s as Record<string, number | undefined>;
-  if (so.critChance != null && so.increasedCritPct == null) {
-    so.increasedCritPct = so.critChance;
-    delete so.critChance;
-  }
-  return {
-    id: raw.id as string,
-    slot: raw.slot as GearSlot,
-    r,
-    base: (raw.base as string) ?? 'blade',
-    ...(raw.set ? { set: raw.set as string } : {}),
-    ...(raw.unique ? { unique: raw.unique as string } : {}),
-    s,
-  };
-}
-
-function migrateGearArray(arr: unknown): GearItem[] {
-  if (!Array.isArray(arr)) return [];
-  return arr.map((it) => migrateItem(it as Record<string, unknown>)).filter(Boolean) as GearItem[];
-}
-
-function migrateGearRecord(obj: unknown): Partial<Record<GearSlot, GearItem>> {
-  if (!obj || typeof obj !== 'object') return {};
-  const out: Partial<Record<GearSlot, GearItem>> = {};
-  for (const [slot, raw] of Object.entries(obj as Record<string, unknown>)) {
-    const item = migrateItem(raw as Record<string, unknown>);
-    if (item) out[slot as GearSlot] = item;
-  }
-  return out;
-}
+// The persisted shape + versioned migrations live in heroSchema.ts (pure,
+// fixture-tested). Re-exported so route/tool code has one import site.
+export { STORED_HERO_VERSION, migrateStoredHero, newStoredHero } from './heroSchema';
+export type { StoredHero } from './heroSchema';
 
 export interface RunGained {
   gold: number;
@@ -90,30 +36,13 @@ export interface RunGained {
   itemsEquipped: number;
 }
 
-export const heroKey = (userId: string): string => `hero:${userId}`;
-
 /** XP needed to advance *from* the given level (rising curve). */
 export const xpToNext = (level: number): number =>
   Math.round(TUNING.hero.xpCurveBase * Math.pow(level, TUNING.hero.xpCurveExp));
 
-function newStoredHero(): StoredHero {
-  const maxHp = classDef('squire').baseMaxHp;
-  return {
-    class: 'squire',
-    level: 1,
-    xp: 0,
-    hp: maxHp,
-    maxHp,
-    gold: 0,
-    bestDepth: 1,
-    lastSeenAt: Date.now(),
-    stash: [],
-    equipped: {},
-  };
-}
-
-/** Recompute maxHp from class + level + gear (shared derive), then clamp hp. */
-function recompute(h: StoredHero): void {
+/** Recompute maxHp from class + level + gear (shared derive), then clamp hp.
+ *  Exported for the heroStore load path (fresh reads recompute before mutate). */
+export function recompute(h: StoredHero): void {
   h.maxHp = deriveStats(h.class, h.level, h.equipped).maxHp;
   if (h.hp > h.maxHp) h.hp = h.maxHp;
 }
@@ -239,27 +168,3 @@ export function applyRun(
   };
 }
 
-// ---- Redis I/O ------------------------------------------------------------
-
-export async function getOrCreateHero(userId: string): Promise<StoredHero> {
-  const raw = await redis.get(heroKey(userId));
-  if (raw) {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    // Back-fill fields added after a hero was first stored.
-    if (typeof parsed.bestDepth !== 'number') parsed.bestDepth = 1;
-    if (typeof parsed.lastSeenAt !== 'number') parsed.lastSeenAt = Date.now();
-    // Migrate old-format gear items (name/rarity/stats → r/s) to the lean v2 shape.
-    parsed.stash = migrateGearArray(parsed.stash);
-    parsed.equipped = migrateGearRecord(parsed.equipped);
-    const h = parsed as unknown as StoredHero;
-    recompute(h); // keep derived maxHp consistent with current gear/level
-    return h;
-  }
-  const h = newStoredHero();
-  await saveHero(userId, h);
-  return h;
-}
-
-export async function saveHero(userId: string, h: StoredHero): Promise<void> {
-  await redis.set(heroKey(userId), JSON.stringify(h));
-}

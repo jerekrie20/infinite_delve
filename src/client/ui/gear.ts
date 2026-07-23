@@ -54,7 +54,6 @@ export function initGearPanel(d: GearDeps): void {
   backdrop = document.getElementById('gear-panel');
   content = document.getElementById('gear-content');
 
-  document.getElementById('btn-gear')?.addEventListener('click', () => toggle());
   document.getElementById('gear-close')?.addEventListener('click', close);
   backdrop?.addEventListener('click', (e) => {
     if (e.target === backdrop) close();
@@ -80,11 +79,6 @@ export function initGearPanel(d: GearDeps): void {
   d.onChange(() => {
     if (isOpen) render();
   });
-}
-
-function toggle(): void {
-  if (isOpen) close();
-  else open();
 }
 
 /** Open the gear/inventory panel from elsewhere (Bag button, inline gear slots). */

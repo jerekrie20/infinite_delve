@@ -101,98 +101,12 @@ export interface Hero {
   equipped: Partial<Record<GearSlot, GearItem>>;
 }
 
-// ---- Delve map ------------------------------------------------------------
+// ---- Monsters -------------------------------------------------------------
 
-export type Biome = 'meadow';
-
-/** Terrain kinds, stored as ints in `DelveMap.tiles` (row-major) for a compact
- * payload the client can index directly. */
-export const Terrain = {
-  Grass: 0,
-  Tree: 1,
-  Water: 2,
-  Hill: 3,
-} as const;
-export type TerrainKind = (typeof Terrain)[keyof typeof Terrain];
-
-/** Grass and Hill are walkable; Tree and Water block movement. */
-export const isWalkable = (t: number): boolean =>
-  t === Terrain.Grass || t === Terrain.Hill;
-
-export interface Point {
-  x: number;
-  y: number;
-}
-
+/** Behavioral archetype of a monster template (drives combat flavor + drop
+ *  rules, e.g. swarms drop more). Canonical here; re-exported by
+ *  content/monsters.ts and waves.ts. */
 export type MonsterKind = 'grunt' | 'swarm' | 'brute' | 'caster';
-
-export interface Monster {
-  id: string;
-  kind: MonsterKind;
-  x: number;
-  y: number;
-  hp: number;
-  attack: number;
-  /** Percent damage reduction, 0..100. */
-  defense: number;
-  /** Reward granted to the hero when this monster is defeated. */
-  xp: number;
-  gold: number;
-}
-
-export interface LootSpot {
-  id: string;
-  x: number;
-  y: number;
-  gold: number;
-  /** A gear drop, if this spot rolled one. */
-  item?: GearItem;
-}
-
-/** Purely cosmetic ground clutter — never blocks movement, never referenced by
- * id. The client draws these once and forgets them (no server round-trip). */
-export type DecorKind = 'rock' | 'bush' | 'flowers' | 'log' | 'mushrooms';
-
-export interface DecorSpot {
-  x: number;
-  y: number;
-  kind: DecorKind;
-}
-
-export interface DelveMap {
-  seed: number;
-  /** How deep this delve is; scales monster stats & population. v0 = 1. */
-  depth: number;
-  biome: Biome;
-  width: number;
-  height: number;
-  /** Row-major `TerrainKind` values, length width*height. */
-  tiles: number[];
-  /**
-   * Row-major elevation level per tile, 0..3, same indexing as `tiles`.
-   * Orthogonal to `tiles`: `tiles[i]` is *what the ground is made of*,
-   * `heights[i]` is *how high it stands*. The isometric renderer lifts a tile
-   * by `heights[i] * LEVEL_PX` screen pixels and draws cliff faces where a tile
-   * is taller than a neighbor. A grass tile can sit at any height.
-   */
-  heights: number[];
-  /** Where the hero starts. */
-  spawn: Point;
-  /** The one extract point; reach it to bank the run. */
-  extract: Point;
-  monsters: Monster[];
-  loot: LootSpot[];
-  /** Non-blocking ground clutter scattered on open grass for visual variety. */
-  decor: DecorSpot[];
-}
-
-/**
- * Two adjacent walkable tiles are connected only if the elevation step between
- * them is at most this. A step of 1 (16px) is a climbable stair; a step of 2+
- * is an impassable cliff you must route around. Must match the client's
- * movement rule so the server's connectivity guarantee holds in-game.
- */
-export const MAX_CLIMBABLE_STEP = 1;
 
 // ---- Endpoint contracts ---------------------------------------------------
 
@@ -215,11 +129,18 @@ export interface RunResultRequest {
   /** Gear found this run (unbanked). Banked on extract, discarded on death.
    *  Server sanitizes/clamps it (v0 trusts the client on drops). */
   haul?: GearItem[];
+  /** Client-generated id for this run (≤64 chars). The server awards each
+   *  runId at most once and replays the stored summary to duplicates — this
+   *  is what makes the client's failed-post retry queue safe. */
+  runId?: string;
 }
 
 export interface RunResultResponse {
   hero: Hero;
   outcome: RunOutcome;
+  /** True when this runId was already banked — `gained` is the ORIGINAL
+   *  summary (replayed), nothing was awarded twice. */
+  duplicate?: boolean;
   gained: {
     gold: number;
     xp: number;
@@ -257,35 +178,3 @@ export interface SellResponse {
   goldGained: number;
 }
 
-export interface DelveStartRequest {
-  /** Optional: push deeper (endless is deferred; v0 defaults to 1). */
-  depth?: number;
-}
-
-export interface DelveStartResponse {
-  delve: DelveMap;
-  hero: Hero;
-}
-
-export type DelveOutcome = 'extracted' | 'died';
-
-export interface DelveResultRequest {
-  /** Monster ids the client reports as defeated this run. */
-  killed: string[];
-  /** Loot-spot ids the client reports as collected this run. */
-  lootGrabbed: string[];
-  depth: number;
-  outcome: DelveOutcome;
-}
-
-export interface DelveResultResponse {
-  hero: Hero;
-  outcome: DelveOutcome;
-  /** What was banked (all zero/empty on death). */
-  gained: {
-    xp: number;
-    gold: number;
-    items: GearItem[];
-    levelsGained: number;
-  };
-}

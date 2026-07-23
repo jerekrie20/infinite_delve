@@ -383,12 +383,16 @@ export const STAT_IDS = Object.keys(STATS) as StatId[];
  *  live items until a programmer wires the handler and flips `implemented: true`. */
 export const isImplemented = (id: StatId): boolean => STATS[id].implemented !== false;
 
-/** Per-derived hard caps. Only FLAT stats' `max` caps the derived TOTAL (they add
- *  straight into it); a PCT stat's `max` caps its own rolled percentage. */
+/** Per-derived hard caps. Only a SELF-TARGETING flat stat's `max` caps the
+ *  derived TOTAL (it adds straight into its own accumulator); a stat feeding a
+ *  FOREIGN target (e.g. blockHeal → maxHp) caps its own roll only — folding its
+ *  max into the target's total was the root cause of the "every hero maxHp 15"
+ *  bug. A PCT stat's `max` likewise caps its own rolled percentage. */
 export const TARGET_MAX: Partial<Record<DerivedId, number>> = (() => {
   const m: Partial<Record<DerivedId, number>> = {};
   for (const def of Object.values(STATS)) {
     if (def.max === undefined || def.op !== 'flat') continue;
+    if (def.id !== def.target) continue; // foreign-target max caps the roll, not the total
     const cur = m[def.target];
     m[def.target] = cur === undefined ? def.max : Math.min(cur, def.max);
   }

@@ -129,7 +129,10 @@ lands with the assert that would have caught it.
   (`game_design/SECURITY_PERF.md` table) and a `devvit.json` mapping if
   it's a menu/scheduler/trigger endpoint.
 - Redis access lives in `server/core/*` modules, not in routes. Account
-  writes use the optimistic `_rev` check (DATA_SCHEMA) once Phase 0 lands.
+  writes go through `updateHero` (heroStore.ts) — WATCH/MULTI/EXEC
+  compare-and-set with mutation replay on conflict (DATA_SCHEMA). Mutators
+  passed to it must be pure functions of the hero they receive (they may
+  re-run).
 - Scheduler jobs must be idempotent — a re-run may never double-award.
 
 ## 6. Client rules

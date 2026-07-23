@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "LORE.md",
+                "file": "art/ART_BIBLE.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "LORE"
+              "title": "ART_BIBLE"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "LORE.md",
+                "file": "art/ART_BIBLE.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for LORE"
+              "title": "Backlinks for ART_BIBLE"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "LORE.md",
+                "file": "art/ART_BIBLE.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from LORE"
+              "title": "Outgoing links from ART_BIBLE"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "LORE.md",
+                "file": "art/ART_BIBLE.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of LORE"
+              "title": "Outline of ART_BIBLE"
             }
           }
         ]
@@ -185,22 +185,24 @@
   },
   "active": "1e8e970e17162527",
   "lastOpenFiles": [
-    "DELVE-SYSTEMS.canvas",
-    "Home.md.tmp.40100.93940e93b584",
-    "RELEASE_PLAN.md.tmp.40100.7ad421a27e0b",
-    "PLAYBOOK.md.tmp.40100.aaea3465dcd3",
-    "PLAYBOOK.md.tmp.40100.49d70d12a6bb",
-    "PLAYBOOK.md.tmp.40100.f72e3bd6b292",
-    "WORLD.md.tmp.40100.081314b6e2f5",
-    "DECISIONS.md.tmp.40100.e957d0da1f42",
+    "DATA_SCHEMA.md.tmp.35936.ff90e9108dd9",
+    "SECURITY_PERF.md.tmp.35936.f8148d34a7d8",
+    "SECURITY_PERF.md.tmp.35936.6eee286d0bee",
+    "SECURITY_PERF.md.tmp.35936.98664c5c3242",
+    "FORMULAS.md.tmp.35936.12d9112e3c3d",
+    "DATA_SCHEMA.md.tmp.35936.1ac4daac937d",
+    "DATA_SCHEMA.md.tmp.35936.9b06e93f50d8",
+    "DATA_SCHEMA.md.tmp.35936.7a181609681a",
+    "DATA_SCHEMA.md.tmp.35936.fe257440fcbb",
+    "FORMULAS.md.tmp.35936.851b5997d460",
+    "ARCHITECTURE.md.tmp.35936.714eb3652d88",
+    "art/asset-manifest.md",
+    "art/ART_BIBLE.md",
     "LORE.md",
-    "LORE.md.tmp.40100.99ae561a879d",
+    "DELVE-SYSTEMS.canvas",
     "DELVE-MAP.canvas",
-    "Home.md.tmp.40100.0e4b72e9b75e",
     "LAUNCH.md",
     "DECISIONS.md",
-    "RELEASE_PLAN.md.tmp.40100.39933c719905",
-    "art/ART_BIBLE.md",
     "TOOLING.md",
     "MIGRATION.md",
     "PLAYBOOK.md",
@@ -220,7 +222,6 @@
     "mechanics/03-combat/combat.md",
     "mechanics/02-monsters/roster.md",
     "mechanics/02-monsters/monsters.md",
-    "mechanics/01-classes/class-kits.md",
-    "mechanics/01-classes/classes.md"
+    "mechanics/01-classes/class-kits.md"
   ]
 }

@@ -30,6 +30,8 @@ export interface MonsterTuning {
   eliteChance: number;
   /** Extra elite chance per depth (additive). */
   eliteChancePerDepth: number;
+  /** Ceiling for elite chance after depth scaling (FORMULAS "cap 40%"). */
+  eliteChanceCap: number;
   /** Multipliers by rarity tier for stats and rewards. */
   eliteHpMult: number;
   eliteAtkMult: number;
@@ -90,12 +92,26 @@ export interface ItemTuning {
   sellValueMult: number;
 }
 
+export interface PlausibilityTuning {
+  /** Absolute ceiling on any reported depth (grief stop, not balance). */
+  hardDepthCap: number;
+  /** Depth a level-1 hero with no gear could plausibly reach. */
+  depthBase: number;
+  /** Extra plausible depth per hero level past 1. */
+  depthPerLevel: number;
+  /** Equipped gearScore points per extra plausible depth. */
+  gearScorePerDepth: number;
+  /** Fastest believable clear pace — one depth per this many seconds. */
+  minSecondsPerFloor: number;
+}
+
 export interface Tuning {
   hero: HeroTuning;
   monster: MonsterTuning;
   combat: CombatTuning;
   idle: IdleTuning;
   items: ItemTuning;
+  plausibility: PlausibilityTuning;
 }
 
 /** The live values. Treated as read-only at runtime; the sandbox works on a clone. */
@@ -123,6 +139,7 @@ export const TUNING: Tuning = {
     // Monster rarity system
     eliteChance: 0.05,
     eliteChancePerDepth: 0.001,
+    eliteChanceCap: 0.4,
     eliteHpMult: 3.5,
     eliteAtkMult: 1.5,
     eliteRewardMult: 4.0,
@@ -158,5 +175,16 @@ export const TUNING: Tuning = {
     setChancePerDepth: 0.0005,
     setChanceCap: 0.15,
     sellValueMult: 0.5,
+  },
+  plausibility: {
+    // Deliberately 2-3× generous vs the real wall (~depth 10 fresh): this
+    // stops depth-100000 leaderboard grief, not subtle cheating — replay
+    // verification (Phase 7) is the real anti-cheat. FORMULAS "Anti-cheat
+    // depth plausibility" bullet mirrors these ⚙ values.
+    hardDepthCap: 2000,
+    depthBase: 15,
+    depthPerLevel: 3,
+    gearScorePerDepth: 10,
+    minSecondsPerFloor: 2,
   },
 };

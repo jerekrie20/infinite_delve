@@ -14,7 +14,7 @@ value, client owns feel; determinism is the anti-cheat.**
 | Data | Trust level | Enforcement |
 |------|------------|-------------|
 | Reward VALUES (gold/xp) | never trusted | server computes from depth via EV formulas ([[FORMULAS]]) |
-| depthReached | plausibility-clamped | vs hero level/gear + min-duration; hard clamp; TODO Phase 0 |
+| depthReached | plausibility-clamped | vs hero level/gear + min-duration; hard clamp (`maxPlausibleDepth`, [[FORMULAS]] anti-cheat bullet — exists, Phase 0) |
 | Gear haul | sanitized | `sanitizeGearItem` caps per-stat vs depth budget; set/rarity/unique recomputed server-side (exists) |
 | Run legitimacy (boards/frontier) | verified by replay | seeded sim re-runs flagged/daily runs; mismatch = shadow-exclude ([[RELEASE_PLAN]] cheat policy) |
 | Mastery/promotion claims | server-side only | trials resolve on the server sim; client never posts "I promoted" |
@@ -23,13 +23,19 @@ value, client owns feel; determinism is the anti-cheat.**
 ## Attack surface checklist (standing)
 
 - Rate limits: run/result ≤1 per 30s ⚙, equip/sell/craft ≤5/s, hero read
-  cheap; per-user, in Redis counters
+  cheap; per-user, in Redis counters (`core/rateLimit.ts`, fixed-window —
+  exists, Phase 0). A 429'd honest run is NOT lost: the client queues +
+  retries it with the same `runId`
+- Run idempotency: `run/result` accepts a client `runId`; replays return the
+  stored summary (`run:done:*` key, [[DATA_SCHEMA]]) without touching the
+  limiter or re-awarding — this is what makes client retry safe
 - One daily attempt: stamped at RUN START (D22), atomic SETNX
 - Frontier soft caps (best-3 rule, [[FORMULAS]]) blunt botting value
 - JSON body size caps; haul ≤40 items (exists); stash page bounds
 - No secrets client-side; Devvit scopes identity — never trust a
   client-supplied userId
-- Concurrency: optimistic `_rev` on account writes ([[DATA_SCHEMA]])
+- Concurrency: WATCH/MULTI/EXEC compare-and-set on account writes
+  ([[DATA_SCHEMA]] — exists, Phase 0)
 - Never brick a save: unknown fields preserved, migrations tested, replay
   flags exclude from BOARDS only — gameplay untouched
 

@@ -46,6 +46,10 @@ import from here — no duplication, no drift. Files:
 | `actives.ts` | Active ability definitions + unlock table |
 | `gear.ts` | `deriveStats()`, banking, equip/unequip logic |
 
+Alongside content: `src/shared/rng.ts` — the seeded mulberry32 PRNG + the
+canonical `Rng` type (waves/items re-export it); `src/shared/waves.ts` — spawn
++ reward math; `src/shared/delve.ts` — hero/gear types + endpoint contracts.
+
 ## Client (Phaser) — `src/client/`
 
 - **`game/LaneScene.ts`** — the combat lane: auto-battle, ability dispatch,
@@ -53,7 +57,7 @@ import from here — no duplication, no drift. Files:
 - **`game/HudScene.ts`** — canvas UI: top bar, stat bars, skill slots,
   gear grid, tabs (Skills/Summary/Equip), money, bag badge
 - **`ui/gear.ts`** — gear panel overlay (DOM), item popup
-- **`ui/hud.ts`** — HudSnapshot type, `formatShort()` utility
+- **`ui/format.ts`** — `formatShort()` utility (HudSnapshot type lives in HudScene)
 - **`ui/daily.ts`** — Daily panel (DOM), frontier display
 - **`main.ts`** — bootstrap, scene creation, event wiring, modal panels
 - **`api.ts`** — HTTP client → server endpoints, MOCK_HERO fallback
@@ -63,8 +67,7 @@ Preview: `npx vite` on port 5178.
 ## Server (TypeScript) — `src/server/`
 
 - **`core/hero.ts`** — hero CRUD in Redis, `toHero()`, XP, banking, idle
-- **`core/rng.ts`** — seeded random for deterministic item generation
-- **`routes/api.ts`** — game endpoints (/api/hero, /api/run/result, /api/equip)
+- **`routes/game.ts`** — game endpoints (/api/hero, /api/run/result, /api/equip)
 - **`routes/daily.ts`** — Daily Delve endpoints
 - **`routes/scheduler.ts`** — cron jobs (daily tick, frontier aggregate)
 

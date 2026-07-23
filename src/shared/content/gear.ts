@@ -126,7 +126,12 @@ export function deriveStats(
   const out = zeroDerived();
   for (const t of DERIVED_IDS) {
     if (t === 'critChance') continue; // computed below
-    let val = Math.round(flat[t] * (1 + pct[t] / 100));
+    // increasedCritPct is a PURE-pct target (no flat base to multiply): the
+    // derived value IS the summed % — the generic fold would yield 0 forever.
+    let val =
+      t === 'increasedCritPct'
+        ? Math.round(flat[t] + pct[t])
+        : Math.round(flat[t] * (1 + pct[t] / 100));
     const cap = TARGET_MAX[t];
     if (cap !== undefined) val = Math.min(val, cap);
     out[t] = val;

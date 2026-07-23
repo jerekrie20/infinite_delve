@@ -54,7 +54,15 @@ For depth d, with base linear ramp `lin(d) = base + perDepth × min(d, 30)`:
   manual boss play yields ~20-30% better outcomes ⚙ (measured in the sim
   as time-to-kill + damage-taken deltas)
 - **Reward EV rule**: server reward math uses EXPECTED value (elite chance ×
-  elite mult folded in analytically) — never a live rarity roll (audit fix)
+  elite mult folded in analytically) — never a live rarity roll (audit fix).
+  Explicit shape (Phase 0, `waves.ts rewardEV`): non-boss depths
+  `rewardEV(d) = lin(d) × meanStatMult(d) × (1 + eliteChance(d) × (eliteRewardMult − 1))`
+  where `meanStatMult(d)` = mean statMult over the non-boss templates active
+  at d (spawn picks uniformly, so the mean IS the template EV); boss floors
+  `rewardEV(d) = lin(d) × bossStatMult × bossRewardMult` (deterministic
+  already). `runReward` sums per-depth EVs and rounds the TOTALS once;
+  `idleGoldPerSecond = rewardEV(bestDepth).gold / secondsPerKill`. The elite
+  cap 40% is TUNING `eliteChanceCap` ⚙ (was hardcoded)
 
 ## Runs & idle
 
@@ -64,6 +72,15 @@ For depth d, with base linear ramp `lin(d) = base + perDepth × min(d, 30)`:
 - **Offline expeditions**: real sim — no formula shortcuts; results ARE the
   sim output (D19). Expedition count/window: tier 4 = 3 runs/8h ⚙, tier 5
   upgrades +2 runs & +4h per rank ⚙
+- **Anti-cheat depth plausibility ⚙** (Phase 0, `waves.ts maxPlausibleDepth`):
+  a reported `depthReached` is hard-clamped to
+  `min(hardDepthCap, depthBase + depthPerLevel×(L−1) + equippedGearScore ÷ gearScorePerDepth, floor(elapsedSeconds ÷ minSecondsPerFloor))`
+  with v1 values `hardDepthCap 2000 · depthBase 15 · depthPerLevel 3 ·
+  gearScorePerDepth 10 · minSecondsPerFloor 2` (TUNING `plausibility`).
+  `elapsedSeconds` = now − `lastSeenAt` (stamped at app-open idle collect and
+  every run result). Bounds are deliberately 2-3× generous — this stops
+  depth-100000 leaderboard grief, not subtle cheating; replay verification
+  (Phase 7) is the real anti-cheat
 
 ## Gear
 
@@ -139,7 +156,7 @@ action) < 40% of a session's income — checked in the sandbox.
 ## Format rule
 
 All player-facing numbers ≥10,000 render short-form (12.3K, 4.5M) — one
-`formatShort()` (exists in `ui/hud.ts`), used everywhere.
+`formatShort()` (exists in `ui/format.ts`), used everywhere.
 
 ## Related
 

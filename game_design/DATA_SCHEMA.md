@@ -6,8 +6,9 @@ status: living
 # Data Schema — persisted state, source of truth
 
 Normative for save shapes and Redis keys (see [[DECISIONS]]). Extends the
-lean-key discipline already in `GearItem` (`r`/`s` short keys). Everything
-below is the TARGET (v2) shape; today's `StoredHero` migrates into it.
+lean-key discipline already in `GearItem` (`r`/`s` short keys). The
+StoredAccount below is the TARGET (v3) shape; today's `StoredHero` (v2)
+migrates into it.
 
 ## Versioning & migration policy
 
@@ -18,11 +19,19 @@ below is the TARGET (v2) shape; today's `StoredHero` migrates into it.
   fixture of the old shape
 - Unknown fields are preserved on read (forward compatibility for hotfixes)
 
-## `hero:{userId}` — the account blob (v2)
+### `hero:{userId}` version ledger
+
+| v | Shape | Migration in |
+|---|-------|--------------|
+| 1 | implicit (no `v` field): original StoredHero; gear items may use old keys (`rarity`/`stats`/`critChance`); `bestDepth`/`lastSeenAt` may be missing | — (inferred on read) |
+| 2 | **current**: StoredHero + `v: 2`; lean gear keys (`r`/`s`, `increasedCritPct`); `bestDepth`/`lastSeenAt` always present | `migrateV1toV2` (`src/server/core/heroSchema.ts`) — consolidates the old key-sniffing |
+| 3 | TARGET: StoredAccount below (checkpoints, automation, masteries, classes…) | with the Phase 2+ features that need it |
+
+## `hero:{userId}` — the account blob (TARGET, v3)
 
 ```ts
 interface StoredAccount {          // ~replaces StoredHero
-  v: 2;
+  v: 3;
   gold: number;
   lastSeenAt: number;              // epoch ms — idle/expedition accrual
   // Account-wide progression (D4, D8, D10, D18)
@@ -83,13 +92,16 @@ them itself for expeditions).
 
 | Key | Type | Content | Expiry |
 |-----|------|---------|--------|
-| `hero:{userId}` | string(JSON) | StoredAccount v2 | none |
+| `hero:{userId}` | string(JSON) | StoredHero v2 (→ StoredAccount v3) | none |
 | `daily:{dayKey}:board` | zset | member=username, score=depth | 7d |
 | `daily:{dayKey}:attempt:{userId}` | string | run-start stamp (one-attempt rule, D22) | 2d |
 | `frontier:{seasonId}` | hash | ladderIndex, bossHp, dmgToday, delverSet ref | season+7d |
 | `frontier:{seasonId}:dmg:{dayKey}` | zset | per-player damage (soft-cap calc) | 7d |
 | `season:current` | string | seasonId + modifier id + startedAt | none |
 | `report:{dayKey}` | string(JSON) | frozen daily report snapshot | 30d |
+| `rl:{bucket}:{userId}:{window}` | string(counter) | fixed-window rate-limit count | 2×window |
+| `run:seen:{userId}:{runId}` | string(counter) | first-wins run-idempotency marker | 48h ⚙ |
+| `run:done:{userId}:{runId}` | string(JSON) | completed run's `gained` summary (replayed to duplicates) | 48h ⚙ |
 
 Devvit scopes Redis per installation — no sub token needed in keys
 (current pattern, kept). Cross-sub (D21 rivalry) needs an external
@@ -97,9 +109,12 @@ aggregation path — deferred with that feature.
 
 ## Concurrency
 
-Account writes use optimistic versioning: read carries `_rev` (or WATCH/
-compare-and-set if available); on conflict, re-read + replay mutation.
-Endpoints ordered: run-result > equip > sell on conflict retries (audit fix).
+Account writes use Redis WATCH/MULTI/EXEC compare-and-set on `hero:{userId}`
+(Devvit's client supports it natively; chosen over a stored `_rev` counter,
+which is not atomic without WATCH anyway — no schema field needed). On
+conflict: re-read + replay the mutation (`updateHero` in
+`src/server/core/heroStore.ts`). Retry budgets ordered
+run-result > hero > equip > sell (audit fix); exhausted retries → 409.
 
 ## Related
 

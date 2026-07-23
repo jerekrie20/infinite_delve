@@ -124,23 +124,38 @@ export async function postSell(itemId: string): Promise<SellResponse | null> {
   }
 }
 
-/** Bank an active run. Returns the server's authoritative result, or null if
- *  the API is unreachable (client then falls back to local-only bookkeeping). */
+/** How a run submission ended. 'retryable' (network down, 429 rate-limited,
+ *  5xx) means the caller should QUEUE the run and re-post it later with the
+ *  same runId — the server dedupes, so a retry never double-awards.
+ *  'rejected' means the server said no and retrying won't help. */
+export type PostRunResult =
+  | { status: 'ok'; resp: RunResultResponse }
+  | { status: 'retryable' }
+  | { status: 'rejected' };
+
+/** Bank an active run. `runId` is the client-generated idempotency id — pass
+ *  the SAME one on every retry of the same run. */
 export async function postRunResult(
   outcome: RunOutcome,
   depthReached: number,
-  haul: GearItem[] = []
-): Promise<RunResultResponse | null> {
+  haul: GearItem[] = [],
+  runId?: string
+): Promise<PostRunResult> {
   try {
     const res = await fetch('/api/run/result', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ outcome, depthReached, haul }),
+      body: JSON.stringify({ outcome, depthReached, haul, runId }),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()) as RunResultResponse;
+    if (res.ok) return { status: 'ok', resp: (await res.json()) as RunResultResponse };
+    if (res.status === 429 || res.status >= 500) {
+      console.warn(`[delve] /api/run/result ${res.status} — queued for retry`);
+      return { status: 'retryable' };
+    }
+    console.warn(`[delve] /api/run/result rejected (HTTP ${res.status})`);
+    return { status: 'rejected' };
   } catch (err) {
-    console.warn('[delve] /api/run/result unavailable — local only', err);
-    return null;
+    console.warn('[delve] /api/run/result unreachable — queued for retry', err);
+    return { status: 'retryable' };
   }
 }

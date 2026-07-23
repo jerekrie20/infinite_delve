@@ -1,16 +1,17 @@
 import Phaser from 'phaser';
+import { showToast } from '@devvit/web/client';
 import { LaneScene } from './game/LaneScene';
 import { HudScene, type HudHooks } from './game/HudScene';
-import { fetchHero } from './api';
+import { fetchHero, postRunResult } from './api';
+import { flushQueue } from './runQueue';
 import { initDailyPanel, refreshDailyPanel } from './ui/daily';
 import { initGearPanel, openGearPanel } from './ui/gear';
 
-/** Wire a simple show/hide overlay panel (backdrop + trigger + close + tap-out). */
-function wirePanel(triggerId: string, panelId: string, closeId: string): void {
+/** Wire an overlay panel's dismissal (close button + tap-out on the backdrop).
+ *  Panels are OPENED from the canvas HUD via HudHooks, not from DOM triggers. */
+function wirePanelClose(panelId: string, closeId: string): void {
   const backdrop = document.getElementById(panelId);
-  const show = (): void => backdrop?.classList.add('show');
   const hide = (): void => backdrop?.classList.remove('show');
-  document.getElementById(triggerId)?.addEventListener('click', show);
   document.getElementById(closeId)?.addEventListener('click', hide);
   backdrop?.addEventListener('click', (e) => {
     if (e.target === backdrop) hide();
@@ -18,6 +19,22 @@ function wirePanel(triggerId: string, panelId: string, closeId: string): void {
 }
 
 async function boot(): Promise<void> {
+  // Re-post any runs whose /api/run/result failed last session BEFORE loading
+  // the hero, so fetchHero returns the already-credited state in one shot.
+  // Deliberate simplification: flush at boot only — a mid-session retry would
+  // burn the 30s rate-limit window against the player's next live run.
+  try {
+    const { recovered } = await flushQueue(localStorage, Date.now(), async (run) => {
+      const result = await postRunResult(run.outcome, run.depthReached, run.haul, run.runId);
+      return result.status;
+    });
+    if (recovered > 0) {
+      showToast(`Recovered ${recovered} unsynced run${recovered > 1 ? 's' : ''}`);
+    }
+  } catch (err) {
+    console.warn('[delve] run-queue flush failed (non-fatal)', err);
+  }
+
   const { hero, idle } = await fetchHero();
 
   const game = new Phaser.Game({
@@ -42,11 +59,6 @@ async function boot(): Promise<void> {
   const lane = (): LaneScene | undefined =>
     game.scene.getScene('LaneScene') as LaneScene | undefined;
 
-  // The HUD now lives on the Phaser canvas (HudScene, skinned via ui-map.json).
-  // Hide the legacy HTML/CSS HUD frame; the modal panels below stay HTML (they
-  // sit outside #hud, so hiding #hud leaves them intact).
-  document.getElementById('hud')?.style.setProperty('display', 'none');
-
   const hooks: HudHooks = {
     openGear: openGearPanel,
     openBase: () => document.getElementById('base-panel')?.classList.add('show'),
@@ -56,8 +68,8 @@ async function boot(): Promise<void> {
   game.scene.add('HudScene', HudScene, true, { hooks, hero });
 
   // Modal panels remain HTML overlays, opened from the canvas HUD buttons.
-  wirePanel('btn-base', 'base-panel', 'base-close');
-  wirePanel('btn-menu', 'menu-panel', 'menu-close');
+  wirePanelClose('base-panel', 'base-close');
+  wirePanelClose('menu-panel', 'menu-close');
   // Opening Daily from the menu closes the menu first (shared backdrop stack).
   document
     .getElementById('btn-daily')

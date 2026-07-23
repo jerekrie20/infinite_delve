@@ -35,14 +35,14 @@ Two hard guardrails on top of the recipe:
 
 Fixed generation parameters:
 
-| Param | Value | Notes |
-|-------|-------|-------|
-| view | `side` | lane game; heroes face EAST, monsters face WEST (no runtime flipping) |
-| shading | `detailed` | grim-glow needs the extra value range (enum: flat/basic/medium/detailed) |
-| outline | `single color black outline` | rendered thin at 64-96px scale |
-| detail | `medium detail` | |
-| character size | `96` (integer!) | PixelLab upscales → 136×136 PNG output (D29: 64-96px band) |
-| props/icons size | 32 (loot/tiles) · 24 (icons) | integers only |
+| Param            | Value                        | Notes                                                                    |
+| ---------------- | ---------------------------- | ------------------------------------------------------------------------ |
+| view             | `side`                       | lane game; heroes face EAST, monsters face WEST (no runtime flipping)    |
+| shading          | `detailed`                   | grim-glow needs the extra value range (enum: flat/basic/medium/detailed) |
+| outline          | `single color black outline` | rendered thin at 64-96px scale                                           |
+| detail           | `medium detail`              |                                                                          |
+| character size   | `96` (integer!)              | PixelLab upscales → 136×136 PNG output (D29: 64-96px band)               |
+| props/icons size | 32 (loot/tiles) · 24 (icons) | integers only                                                            |
 
 Known API gotchas (from production use): ~4 create calls then a 429 — space
 them out; generations fail under "heavy load" — retry; `size` must be a

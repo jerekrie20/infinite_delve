@@ -5,6 +5,7 @@
 // Pure — takes an Rng so the client rolls live and it stays testable.
 
 import type { GearItem, GearSlot, GearStats, Rarity } from '../delve';
+import type { Rng } from '../rng';
 import { TUNING } from './tuning';
 import { STATS, STAT_IDS, isImplemented, type StatId } from './stats';
 import { SET_BY_BASE, SETS, type SetItemDef } from './sets';
@@ -26,7 +27,7 @@ const SET_ITEM_BY_ID: Record<string, SetItemDef> = Object.fromEntries(
 );
 
 /** A 0..1 random source (defaults to Math.random; tests pass a seeded one). */
-export type Rng = () => number;
+export type { Rng };
 
 interface RarityTier {
   id: Rarity;

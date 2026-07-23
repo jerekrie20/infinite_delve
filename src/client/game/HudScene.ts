@@ -1,8 +1,24 @@
 import Phaser from 'phaser';
-import type { GearSlot, Hero } from '../../shared/delve';
-import { formatShort, type HudSnapshot } from '../ui/hud';
+import type { CombatTurn, GearSlot, Hero } from '../../shared/delve';
+import { formatShort } from '../ui/format';
 import { openItemPopup } from '../ui/gear';
 import { ACTIVES } from '../../shared/content/actives';
+
+/** Live combat + hero state the HUD paints from. LaneScene emits this shape on
+ *  the 'hud-changed' game event; the HUD only reads it. */
+export interface HudSnapshot {
+  depth: number;
+  bankedGold: number;
+  /** Unbanked gold earned this run (surfaced on the EXTRACT button). */
+  runGold: number;
+  /** Unbanked gear count this run (Bag badge). */
+  haulCount: number;
+  hp: number;
+  maxHp: number;
+  hero: Hero;
+  /** Last 5 combat turns for the summary tab. */
+  combatTurns?: CombatTurn[];
+}
 
 /** The main-page HUD rendered as Phaser canvas objects, skinned with the wooden
  *  UI kit via ui-map.json (role → atlas frame + nine-slice insets + bar fills).

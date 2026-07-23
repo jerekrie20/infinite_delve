@@ -25,12 +25,12 @@ Per stage: base sprite + idle(4f) + attack(4f) + run(4f) + **anchor tables**
 (hand/head/chest/hip/feet per frame — required for paper-doll, see
 [[ART_BIBLE]] §5).
 
-| Stage | Base | Anims | Anchors | Phase |
-|-------|------|-------|---------|-------|
-| Squire | ✅ `spr_hero.png` (ID `1a5b8f3b…`) | ⬜ | ⬜ | 3 |
-| Archer · Apprentice | ⬜ ⬜ | ⬜ | ⬜ | 3 (class select needs them) |
-| Warrior · Ranger · Mage | ⬜ ×3 | ⬜ | ⬜ | 5 (promotions) |
-| Knight · Sniper · Archmage | ⬜ ×3 | ⬜ | ⬜ | 5 (masteries) |
+| Stage                      | Base                              | Anims | Anchors | Phase                       |
+| -------------------------- | --------------------------------- | ----- | ------- | --------------------------- |
+| Squire                     | ✅ `spr_hero.png` (ID `1a5b8f3b…`) | ⬜     | ⬜       | 3                           |
+| Archer · Apprentice        | ⬜ ⬜                               | ⬜     | ⬜       | 3 (class select needs them) |
+| Warrior · Ranger · Mage    | ⬜ ×3                              | ⬜     | ⬜       | 5 (promotions)              |
+| Knight · Sniper · Archmage | ⬜ ×3                              | ⬜     | ⬜       | 5 (masteries)               |
 
 ## 2. Monsters — 18 templates + 6 bosses ([[roster]])
 

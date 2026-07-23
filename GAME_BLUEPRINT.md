@@ -1,3 +1,8 @@
+> **SUPERSEDED (2026-07-22).** This document is the original "Faction War"
+> concept, kept for historical reference only. The project pivoted to the
+> Infinite Delve idle looter — the live design source of truth is
+> `game_design/`; start at `game_design/DECISIONS.md` (D1–D49).
+
 # Faction War — Blueprint (the WHY above the what)
 
 *Status: v1 brainstorm, 2026-07-08. This document sits ABOVE `GAME_DESIGN.md`:

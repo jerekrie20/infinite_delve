@@ -13,70 +13,8 @@
   <body>
     <div id="app">
       <div id="game"></div>
-      <div id="hud">
-        <!-- Top bar: base · map details · overflow menu -->
-        <div id="topbar">
-          <button id="btn-base" class="icon-btn" aria-label="Go to base">🏠</button>
-          <div id="map-details">
-            <div class="md-title">The Delve</div>
-            <div id="md-sub" class="md-sub">Depth 1</div>
-          </div>
-          <button id="btn-menu" class="icon-btn" aria-label="More menus">🔽</button>
-        </div>
-
-        <!-- Action layer floating over the Phaser lane -->
-        <div id="map-actions">
-          <button id="btn-extract" class="btn btn-extract">EXTRACT &amp; BANK</button>
-        </div>
-
-        <!-- Bottom control panel (tabbed: Skills / Equip) -->
-        <div id="panel">
-          <div id="tabs" role="tablist">
-            <button id="tab-btn-skills" class="tab-btn active" data-tab="skills">
-              ⚡ Skills
-            </button>
-            <button id="tab-btn-equip" class="tab-btn" data-tab="equip">
-              🎒 Equip
-            </button>
-          </div>
-
-          <!-- Tab 1: skills + HP / MP / XP bars -->
-          <div id="tab-skills" class="tab-page active" data-tab="skills">
-            <div id="bars">
-              <div class="stat-bar">
-                <span class="bar-label">XP</span>
-                <div class="bar-track"><div id="xp-fill" class="bar-fill xp"></div></div>
-                <span id="xp-val" class="bar-val"></span>
-              </div>
-              <div class="stat-bar">
-                <span class="bar-label">HP</span>
-                <div class="bar-track"><div id="hp-fill" class="bar-fill hp"></div></div>
-                <span id="hp-val" class="bar-val"></span>
-              </div>
-              <div class="stat-bar">
-                <span class="bar-label">MP</span>
-                <div class="bar-track"><div id="mp-fill" class="bar-fill mp"></div></div>
-                <span id="mp-val" class="bar-val">—</span>
-              </div>
-            </div>
-
-            <div id="skills"></div>
-          </div>
-
-          <!-- Tab 2: equipped gear + bag + gold -->
-          <div id="tab-equip" class="tab-page" data-tab="equip">
-            <div id="gear-area">
-              <div id="gear-grid"></div>
-              <div id="gear-side">
-                <div id="money" class="money">◆ 0</div>
-                <button id="btn-gear" class="bag-btn" aria-label="Open inventory">
-                  🎒<span id="bag-badge" class="badge" hidden></span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- The HUD is rendered on the Phaser canvas (HudScene). Only the modal
+           panels below remain HTML overlays. -->
       <div id="daily-panel" class="panel-backdrop">
         <div class="panel">
           <button id="daily-close" class="panel-close" aria-label="Close">✕</button>

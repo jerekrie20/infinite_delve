@@ -8,6 +8,7 @@ import { STATS, type StatId } from '../../shared/content/stats';
 import { HANDLERS, type HandlerResult } from '../../shared/content/handlers';
 import { ACTIVES, ACTIVE_HANDLERS, type ActiveBuff } from '../../shared/content/actives';
 import { postEquip, postRunResult, postSell } from '../api';
+import { enqueueRun, newRunId } from '../runQueue';
 
 /** The side-view idle combat lane. Auto-battles down through depths (one monster
  *  per depth); the player's only choice is when to EXTRACT (bank) before the
@@ -148,6 +149,9 @@ export class LaneScene extends Phaser.Scene {
   private depth = 1;
   private runGold = 0;
   private runHaul: GearItem[] = [];
+  /** Idempotency id for THIS run — the server banks each runId at most once,
+   *  so a queued retry of a failed post can never double-award. */
+  private runId = newRunId();
   private bankedGold = 0;
   private pendingIdle?: IdleGains;
   private over = false;
@@ -619,20 +623,34 @@ export class LaneScene extends Phaser.Scene {
     this.over = true;
     const cleared = this.clearedDepth();
     const haul = this.runHaul;
+    const runId = this.runId;
     const gearLine = haul.length ? `\n+${haul.length} gear` : '';
-    const resp = await postRunResult('extracted', cleared, haul);
-    if (resp) {
+    const result = await postRunResult('extracted', cleared, haul, runId);
+    if (result.status === 'ok') {
+      const resp = result.resp;
       this.hero = resp.hero;
       this.bankedGold = resp.hero.gold;
       const eq = resp.gained.itemsEquipped ? `  (${resp.gained.itemsEquipped} equipped)` : '';
       this.banner(`EXTRACTED\n+${resp.gained.gold}◆${gearLine}${eq}`, '#5bd06a');
     } else {
-      // Offline (preview): bank the haul locally so gear + power growth show.
+      // Server unreachable/busy: bank locally so gear + power growth show. A
+      // retryable failure is also QUEUED and re-posted (same runId) on next
+      // boot — the run reaches the server instead of vanishing on reload.
+      if (result.status === 'retryable') {
+        enqueueRun(localStorage, {
+          runId,
+          outcome: 'extracted',
+          depthReached: cleared,
+          haul,
+          queuedAt: Date.now(),
+        });
+      }
       bankHaul(this.hero, haul);
       this.hero.gold += this.runGold;
       this.rederiveHero();
       this.bankedGold = this.hero.gold;
-      this.banner(`EXTRACTED\n+${this.runGold}◆${gearLine}`, '#5bd06a');
+      const syncNote = result.status === 'retryable' ? '\nrun saved — will sync' : '';
+      this.banner(`EXTRACTED\n+${this.runGold}◆${gearLine}${syncNote}`, '#5bd06a');
     }
     this.syncHeroStats();
     this.resetRun();
@@ -644,11 +662,23 @@ export class LaneScene extends Phaser.Scene {
   private die(): void {
     this.over = true;
     const reached = this.clearedDepth();
+    const runId = this.runId; // capture — resetRun rotates it before the post may settle
     // Depth reached still counts toward "deepest delve today" — record it, then
-    // let the Daily panel repaint once the server write lands.
-    void postRunResult('died', reached).then(() =>
-      this.sys.game.events.emit('run-resolved', { outcome: 'died', reached })
-    );
+    // let the Daily panel repaint once the server write lands. A retryable
+    // failure (offline, or a fast death hitting the 1/30s limit) is queued so
+    // the depth still reaches the board later.
+    void postRunResult('died', reached, [], runId).then((result) => {
+      if (result.status === 'retryable') {
+        enqueueRun(localStorage, {
+          runId,
+          outcome: 'died',
+          depthReached: reached,
+          haul: [],
+          queuedAt: Date.now(),
+        });
+      }
+      this.sys.game.events.emit('run-resolved', { outcome: 'died', reached });
+    });
     this.banner('DIED', '#ff5470');
     this.time.delayedCall(1500, () => this.resetRun());
   }
@@ -658,6 +688,7 @@ export class LaneScene extends Phaser.Scene {
     this.depth = 1;
     this.runGold = 0;
     this.runHaul = [];
+    this.runId = newRunId(); // fresh idempotency id for the next run
     this.heroC.hp = this.heroC.maxHp;
     this.heroMana = this.hero.maxMana; // mana resets each run
     this.attackTimer = ATTACK_INTERVAL_MS;

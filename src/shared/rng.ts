@@ -1,5 +1,10 @@
-/** Deterministic PRNG (mulberry32) so delve generation is reproducible from a
- * seed and server-verifiable later. Copied from the Faction War map generator. */
+// Seeded deterministic PRNG (mulberry32) + draw helpers. THE `Rng` type every
+// shared module signs its randomness with (waves/items re-export it). Same seed
+// = bit-identical stream — Daily Delve fairness, offline sim, replay
+// verification, and the test suite all depend on that; never swap the
+// algorithm without versioning anything persisted that was rolled from a seed.
+
+/** A 0..1 random source (Math.random at runtime; createRng(seed) in tests/sims). */
 export type Rng = () => number;
 
 export const createRng = (seed: number): Rng => {

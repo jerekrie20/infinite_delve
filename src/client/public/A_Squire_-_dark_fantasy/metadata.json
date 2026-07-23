@@ -1,0 +1,36 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "083cf2ff-d9a0-4e88-8806-3e5cf152cf24",
+        "name": "A Squire - dark fantasy",
+        "prompt": "A Squire - dark fantasy pixel art, moody desaturated colors with luminous glowing accents, rim lighting, subtle dark outline, gritty heroic dungeon atmosphere",
+        "size": {
+          "width": 184,
+          "height": 184
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "side",
+        "created_at": "2026-07-23T01:45:18.365193+00:00"
+      },
+      "folder": "A_Squire_-_dark_fantasy",
+      "frames": {
+        "rotations": {
+          "south": "A_Squire_-_dark_fantasy/rotations/south.png",
+          "south-east": "A_Squire_-_dark_fantasy/rotations/south-east.png",
+          "east": "A_Squire_-_dark_fantasy/rotations/east.png",
+          "north-east": "A_Squire_-_dark_fantasy/rotations/north-east.png",
+          "north": "A_Squire_-_dark_fantasy/rotations/north.png",
+          "north-west": "A_Squire_-_dark_fantasy/rotations/north-west.png",
+          "west": "A_Squire_-_dark_fantasy/rotations/west.png",
+          "south-west": "A_Squire_-_dark_fantasy/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-07-23T01:49:28.087943"
+}

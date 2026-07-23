@@ -22,7 +22,12 @@ gates in `game_design/METRICS.md`; when adding content, follow
 - [x] Hero persistence: Redis, deriveStats, banking, idle gold trickle
 - [x] Meta scaffolding (parked): daily seed, per-sub board, frontier aggregate, scheduler
 - [x] Tools: combat sim (HTML+CLI), gear editor, UI map tools, `?debug=1` log
-- [x] Fresh-hero HP fix (Squire baseMaxHp 40) — was the "HP 15" bug; verify once in playtest
+- [x] Fresh-hero HP fix — REAL root cause found by the Phase 0 test harness:
+      staged behavioral stats (blockHeal/shieldLeech/startingShield) with
+      `target: 'maxHp'` poisoned TARGET_MAX, capping every hero's maxHp at 15.
+      Fixed (self-targeting-only cap rule) + regression assert in tests/
+- [x] increasedCritPct fix (found by the harness) — pure-pct target folded to 0,
+      so "% increased crit" gear never applied; special-cased in deriveStats
 
 ---
 
@@ -31,27 +36,43 @@ gates in `game_design/METRICS.md`; when adding content, follow
 Correctness/exploit issues that corrupt balance data and player trust while
 they live. All are contained changes.
 
-- [ ] **Deterministic reward math** — `runReward()` + `idleGoldPerSecond()`
-      currently live-roll elite chance (random payouts; idle rate can silently 4×).
-      Switch to expected-value (or seeded) monster rewards in `waves.ts`
-- [ ] **Depth plausibility clamp + rate limit** on `/api/run/result` — depth
-      is client-trusted up to 100,000 and the daily leaderboard already records
-      it. Clamp vs hero level/gear + min-run-duration sanity check
-- [ ] **Save schema versioning** — add `v` field to StoredHero + explicit
-      migration table; retire key-sniffing before hero state grows (masteries,
-      checkpoints, automation are coming)
-- [ ] **Extract retry** — failed `/api/run/result` currently vanishes the run
-      on reload (silent local-only fallback). Queue + retry, tell the player
-- [ ] **Redis lost-update guard** — get→mutate→set races between equip/sell/run
-      endpoints; add optimistic version check on save
-- [ ] **Dead code sweep** — delete/quarantine map-era code: `delvegen.ts`,
-      `noise.ts`, `DelveMap`/`Terrain` types, legacy `/api/init|state|score`
-      routes, hidden HTML HUD (`ui/hud.ts` render path)
-- [ ] **Docs hygiene** — mark `GAME_BLUEPRINT.md` superseded (points to
+- [x] **Deterministic reward math** — `runReward()` + `idleGoldPerSecond()`
+      now use `rewardEV()` (elite chance × mult folded analytically, mean
+      template statMult; boss floors exact). `eliteChanceAtDepth()` is the one
+      curve for spawns AND EV; cap moved to TUNING `eliteChanceCap` ⚙
+- [x] **Depth plausibility clamp + rate limit** on `/api/run/result` — depth
+      clamped by `maxPlausibleDepth` (level + gear + elapsed-time bounds, ⚙ in
+      TUNING.plausibility / FORMULAS); rate limits per SECURITY_PERF (1/30s
+      run, 5/s equip+sell) via new `core/rateLimit.ts`; run idempotency via
+      client `runId` + `core/runDedupe.ts` (dedupe checked BEFORE the limiter);
+      clamped depth also feeds the daily board/frontier
+- [x] **Save schema versioning** — `v` field + explicit migration table in new
+      pure `core/heroSchema.ts` (v1 implicit → v2 current; key-sniffing now
+      lives ONLY inside `migrateV1toV2`); DATA_SCHEMA version ledger added
+      (target StoredAccount renumbered v3); fixture tests
+- [x] **Extract retry** — failed `/api/run/result` (network/429/5xx) now queues
+      in localStorage (`client/runQueue.ts`, cap 20, 24h horizon < 48h server
+      dedupe TTL) and re-posts with the same `runId` at next boot ("Recovered N
+      unsynced runs" toast); banner says "run saved — will sync". Death depths
+      queue too, so fast honest deaths still reach the daily board
+- [x] **Redis lost-update guard** — all 4 game endpoints now go through
+      `updateHero` (new `core/heroStore.ts`): WATCH/MULTI/EXEC compare-and-set,
+      conflict → fresh read + mutation replay (budgets run-result>hero>equip>
+      sell), exhausted → 409. hero.ts is now fully pure (no redis import)
+- [x] **Dead code sweep** — deleted map-era code (`delvegen.ts`, `noise.ts`,
+      `DelveMap`/`Terrain` types + map contracts), legacy `/api/init|state|score`
+      demo routes (+ `shared/api.ts`), demo form (`forms.ts` + devvit.json
+      mapping + broken menu item), hidden HTML HUD (`ui/hud.ts` + `#hud` DOM;
+      `formatShort`→`ui/format.ts`, `HudSnapshot`→HudScene). Moved
+      `core/rng.ts`→`shared/rng.ts` (canonical seeded `Rng`)
+- [x] **Docs hygiene** — marked `GAME_BLUEPRINT.md` superseded (points to
       `game_design/`); it describes the old Faction War concept
-- [ ] **Test harness** — tsx-run test file over shared math (`deriveStats`,
+- [x] **Test harness** — tsx-run test file over shared math (`deriveStats`,
       `rollGear`/`sanitizeGearItem`, `runReward`, `frontier` with fake Redis).
-      The shared layer was built for this; balance work needs the safety net
+      The shared layer was built for this; balance work needs the safety net.
+      Built: `tests/` (helpers + fake Redis + 4 suites), `npm run test`,
+      tests tsconfig + eslint block. Immediately caught the maxHp-15 and
+      increasedCritPct-dead bugs above
 
 ## 🟠 Phase 1 — Combat framework v2 (D14, D30-D32) — unblocks nearly everything
 
