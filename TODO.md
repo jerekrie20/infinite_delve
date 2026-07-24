@@ -163,9 +163,15 @@ Temple promotion GATE on those levels is Phase 5.
 - [x] **Player passive slots** — wire class passive pools into `deriveStats()`
       (FIXED per class/level — slot order = pool order, levels 1/12/35/60;
       rng-free so deriveStats stays pure. `heroInnatePassives` in `passives.ts`)
-- [ ] **Class select screen** + hero-creation moment (all 3 bases, D13)
-- [ ] **Guided first run** — authored gentle seed d1-5, 2-3 inline prompts,
-      skippable after prompt 1 (D35), first-extract celebration
+- [x] **Class select screen** + hero-creation moment (all 3 bases, D13) —
+      `ui/classSelect.ts` overlay (cards read the CLASSES registry), gated to a
+      fresh hero; `POST /api/hero/class` → `chooseClass` (fresh-only, no respec);
+      `newStoredClass` seeds the per-class loadout. Client `delve:onboarded:v1`.
+- [x] **Guided first run** — `ui/guide.ts`: coach prompts (auto-battle → choice
+      doors on first `run-choice` → first-extract celebration), skippable from
+      prompt 1 (D35); `delve:tutorial:v1` shows-once, veterans pre-marked done.
+      (Authored gentle seed skipped — early floors are already gentle; revisit
+      if the intro needs to guarantee reaching the depth-5 choice.)
 - [ ] **Grim-glow sprite regeneration** (D29) — hero/goblin/rat are
       style-obsolete; regenerate + class sprites (squire/archer/apprentice)
       + monster pass per ART_BIBLE recipe & asset-manifest phases

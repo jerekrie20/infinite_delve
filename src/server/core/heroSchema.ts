@@ -8,6 +8,7 @@
 
 import type { GearItem, GearSlot, HeroClass } from '../../shared/delve';
 import { classDef } from '../../shared/content/classes';
+import { CLASS_ABILITIES } from '../../shared/content/actives';
 
 /** Current write version. Bump WITH a new MIGRATIONS step + a fixture test +
  *  the DATA_SCHEMA.md ledger row — never alone. */
@@ -74,6 +75,27 @@ export interface StoredHero {
   essences: number[];
 }
 
+/** A fresh per-class progression + loadout. Slot 1/2 default to the class's
+ *  option-1 basic + guard (class-kits.md unlock order); combat currently derives
+ *  usable abilities from class+level, so the loadout is the saved slot choice. */
+export function newStoredClass(classId: HeroClass): StoredClass {
+  const unlocks = [...(CLASS_ABILITIES[classId] ?? [])].sort((a, b) => a.level - b.level);
+  const basic = unlocks[0]?.abilityId;
+  const guard = unlocks[1]?.abilityId;
+  const loadout: Record<number, string> = {};
+  if (basic) loadout[1] = basic;
+  if (guard) loadout[2] = guard;
+  return {
+    level: 1,
+    xp: 0,
+    stage: 0,
+    loadout,
+    rotation: [],
+    optionsUnlocked: guard ? [guard] : [],
+    equipped: {},
+  };
+}
+
 export function newStoredHero(nowMs: number): StoredHero {
   const maxHp = classDef('squire').baseMaxHp;
   return {
@@ -91,17 +113,7 @@ export function newStoredHero(nowMs: number): StoredHero {
     checkpoints: [1],
     automation: { tiers: 0 },
     activeClass: 'squire',
-    classes: {
-      squire: {
-        level: 1,
-        xp: 0,
-        stage: 0,
-        loadout: { 1: 'slam', 2: 'fortify' },
-        rotation: [],
-        optionsUnlocked: ['fortify'],
-        equipped: {},
-      },
-    },
+    classes: { squire: newStoredClass('squire') },
     masteries: [],
     stashPages: 1,
     cosmetics: [],

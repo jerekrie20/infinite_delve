@@ -16,10 +16,12 @@
 import { Hono } from 'hono';
 import { context, redis, reddit } from '@devvit/web/server';
 import type {
+  ChooseClassRequest,
   EquipRequest,
   EquipResponse,
   GearItem,
   GearSlot,
+  HeroClass,
   HeroResponse,
   RunResultRequest,
   RunResultResponse,
@@ -28,6 +30,7 @@ import type {
 } from '../../shared/delve';
 import {
   applyRun,
+  chooseClass,
   collectIdle,
   equipItem,
   newStoredHero,
@@ -104,6 +107,44 @@ game.post('/hero/reset', async (c) => {
     if (isConflict(error)) return c.json<ErrorResponse>({ error: 'Busy — please retry' }, 409);
     console.error('POST /api/hero/reset error:', error);
     return c.json<ErrorResponse>({ error: 'Failed to reset hero' }, 500);
+  }
+});
+
+/** Choose the base class at creation (D13). Only mutates a FRESH hero (server-
+ *  enforced in chooseClass — never a free respec). Rate-limited on the reset
+ *  bucket policy (1 per 10s) so a mistap can't hammer it. */
+game.post('/hero/class', async (c) => {
+  try {
+    const uid = playerId();
+    const nowMs = Date.now();
+
+    let body: ChooseClassRequest;
+    try {
+      body = await c.req.json<ChooseClassRequest>();
+    } catch {
+      return c.json<ErrorResponse>({ error: 'Invalid JSON body' }, 400);
+    }
+    const validClasses: HeroClass[] = ['squire', 'archer', 'apprentice'];
+    if (!validClasses.includes(body.classId)) {
+      return c.json<ErrorResponse>({ error: 'Unknown class' }, 400);
+    }
+
+    const rl = RATE_LIMITS.reset;
+    const allowed = await consumeRateLimit(redis, 'hero-class', uid, rl.limit, rl.windowSeconds, nowMs);
+    if (!allowed) return c.json<ErrorResponse>({ error: 'Too fast — try again' }, 429);
+
+    const { hero } = await updateHero(
+      redis,
+      uid,
+      nowMs,
+      (h) => chooseClass(h, body.classId),
+      CAS_ATTEMPTS.hero
+    );
+    return c.json<HeroResponse>({ hero: toHero(hero) });
+  } catch (error) {
+    if (isConflict(error)) return c.json<ErrorResponse>({ error: 'Busy — please retry' }, 409);
+    console.error('POST /api/hero/class error:', error);
+    return c.json<ErrorResponse>({ error: 'Failed to set class' }, 500);
   }
 });
 

@@ -792,6 +792,8 @@ export class LaneScene extends Phaser.Scene {
     const pal = THEME_PALETTES[themeForDepth(s.depth + 1)] ?? THEME_PALETTES.goblin_camp!;
     this.descendGlow.setFillStyle(pal.glow, 0.5);
     this.choiceGroup.setVisible(true);
+    // Guided first run (D35): the coach's "these are the doors" prompt hooks this.
+    this.sys.game.events.emit('run-choice', { depth: s.depth });
     this.choicePulse?.stop();
     for (const glow of [this.extractGlow, this.descendGlow]) { glow.setScale(0.9); glow.setAlpha(0.45); }
     this.choicePulse = this.tweens.add({

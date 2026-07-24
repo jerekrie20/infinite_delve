@@ -6,11 +6,12 @@
 // banked via applyRun. Reward values are server-computed from the shared wave
 // formula, so the client is never trusted on amounts.
 
-import type { GearItem, GearSlot, Hero, RunOutcome } from '../../shared/delve';
+import type { GearItem, GearSlot, Hero, HeroClass, RunOutcome } from '../../shared/delve';
 import { computeIdle, runReward, type IdleGains } from '../../shared/waves';
 import { TUNING } from '../../shared/content/tuning';
 import { sellValue } from '../../shared/content/items';
-import type { StoredHero } from './heroSchema';
+import { CLASSES } from '../../shared/content/classes';
+import { newStoredClass, type StoredHero } from './heroSchema';
 import {
   bankHaul as bankHaulState,
   deriveStats,
@@ -45,6 +46,36 @@ export const xpToNext = (level: number): number =>
 export function recompute(h: StoredHero): void {
   h.maxHp = deriveStats(h.class, h.level, h.equipped).maxHp;
   if (h.hp > h.maxHp) h.hp = h.maxHp;
+}
+
+/** A hero that has never made progress — the only state in which the class may
+ *  still be chosen/changed (the D13 creation moment, NOT a free respec). */
+export function isFreshHero(h: StoredHero): boolean {
+  return (
+    h.level === 1 &&
+    h.xp === 0 &&
+    (h.bestDepth ?? 1) <= 1 &&
+    h.gold === 0 &&
+    h.stash.length === 0 &&
+    Object.keys(h.equipped).length === 0 &&
+    (h.masteries?.length ?? 0) === 0
+  );
+}
+
+/** Set the hero's base class at creation (D13: all 3 bases at the start). Only
+ *  permitted while the hero is still fresh — a started hero can't respec this
+ *  way. Recomputes maxHp from the new class base and tops off HP. Returns false
+ *  if the class is unknown or the hero has already begun. */
+export function chooseClass(h: StoredHero, classId: HeroClass): boolean {
+  if (!CLASSES[classId] || !isFreshHero(h)) return false;
+  h.class = classId;
+  h.activeClass = classId;
+  if (!h.classes[classId]) h.classes[classId] = newStoredClass(classId);
+  h.level = 1;
+  h.xp = 0;
+  recompute(h); // maxHp derives from the new class base
+  h.hp = h.maxHp;
+  return true;
 }
 
 /** Shape a StoredHero into the client-facing Hero (adds derived stats). */

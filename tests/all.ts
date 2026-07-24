@@ -14,6 +14,7 @@ await import('./statuses.test');
 await import('./rotation.test');
 await import('./combat-engine.test');
 await import('./hero-schema.test');
+await import('./hero-class.test');
 await import('./hero-store.test');
 await import('./rate-limit.test');
 await import('./run-dedupe.test');

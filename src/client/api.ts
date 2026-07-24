@@ -3,6 +3,7 @@ import type {
   GearItem,
   GearSlot,
   Hero,
+  HeroClass,
   HeroResponse,
   RunOutcome,
   RunResultResponse,
@@ -121,6 +122,24 @@ export async function postSell(itemId: string): Promise<SellResponse | null> {
     return (await res.json()) as SellResponse;
   } catch (err) {
     console.warn('[delve] /api/sell unavailable — local only', err);
+    return null;
+  }
+}
+
+/** Choose the base class at creation (D13). Returns the updated hero, or null
+ *  if the API is unreachable — the caller then previews the class locally.
+ *  Server ignores the request unless the hero is still fresh. */
+export async function postChooseClass(classId: HeroClass): Promise<HeroResponse | null> {
+  try {
+    const res = await fetch('/api/hero/class', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ classId }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as HeroResponse;
+  } catch (err) {
+    console.warn('[delve] /api/hero/class unavailable — local preview only', err);
     return null;
   }
 }

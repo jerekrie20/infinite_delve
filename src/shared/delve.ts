@@ -111,6 +111,12 @@ export interface HeroResponse {
   idle?: IdleGains;
 }
 
+/** Choose the base class at the creation moment (D13). Server-validated: only
+ *  applied while the hero is still fresh. Response reuses HeroResponse. */
+export interface ChooseClassRequest {
+  classId: HeroClass;
+}
+
 export type RunOutcome = 'extracted' | 'died';
 
 /** Client reports the end of an active run. The server recomputes the reward

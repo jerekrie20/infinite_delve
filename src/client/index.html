@@ -51,6 +51,19 @@
           </div>
         </div>
       </div>
+      <!-- Class select / hero-creation moment (D13): shown once, for a brand-
+           new fresh hero, before the first run. Picking posts to
+           /api/hero/class and starts the guided first run. -->
+      <div id="class-panel" class="panel-backdrop">
+        <div class="panel">
+          <div class="panel-title">Hero Creation</div>
+          <div class="panel-day">Choose Your Delver</div>
+          <div id="class-list" class="class-list"></div>
+        </div>
+      </div>
+      <!-- Guided first-run coach bubble (D35). NOT a .panel-backdrop, so the
+           game keeps running behind it; only the bubble captures input. -->
+      <div id="coach" class="coach" aria-live="polite"></div>
       <!-- Checkpoint picker: after death or extract, pick start depth (D4).
            On death it doubles as the recap card (D34): the recap block fills
            and the panel stays until the player picks where to delve next. -->

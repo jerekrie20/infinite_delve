@@ -401,6 +401,165 @@ body {
   background: linear-gradient(#28c0d0, #1590b0);
 }
 
+/* ---- Class select (hero creation, D13) ---------------------------------- */
+
+.class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.class-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.25));
+  color: #ece7f5;
+  cursor: pointer;
+  transition: transform 0.06s ease, border-color 0.12s ease;
+}
+
+.class-card:hover,
+.class-card:active {
+  border-color: rgba(199, 139, 255, 0.6);
+  background: linear-gradient(rgba(199, 139, 255, 0.12), rgba(0, 0, 0, 0.25));
+}
+
+.class-card:active {
+  transform: translateY(2px);
+}
+
+.cc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cc-emoji {
+  font-size: 26px;
+}
+
+.cc-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.cc-fantasy {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #c78bff;
+}
+
+.cc-style {
+  margin-top: 4px;
+  font-size: 14px;
+  color: #cbc3dd;
+}
+
+.cc-stats {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: #dfe9ff;
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-ability {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #9d8fc0;
+}
+
+.cc-ability b {
+  color: #ffe066;
+}
+
+/* ---- Guided first-run coach (D35) --------------------------------------- */
+
+.coach {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  right: 0;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  display: none;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none; /* only the bubble catches input; game runs behind */
+}
+
+.coach.show {
+  display: flex;
+}
+
+.coach-bubble {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 440px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(199, 139, 255, 0.5);
+  background: linear-gradient(#241a3a, #170f28);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+  color: #ece7f5;
+}
+
+.coach-bubble.celebrate {
+  border-color: rgba(120, 208, 160, 0.6);
+  background: linear-gradient(#1c3326, #12241a);
+}
+
+.coach-text {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.coach-text b {
+  color: #ffe066;
+}
+
+.coach-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.coach-skip,
+.coach-next {
+  pointer-events: auto;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.coach-skip {
+  color: #9d8fc0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.coach-next {
+  color: #ffffff;
+  background: linear-gradient(#8a5bff, #6a3bef);
+}
+
+.coach-skip:active,
+.coach-next:active {
+  transform: translateY(1px);
+}
+
 /* ---- Daily panel -------------------------------------------------------- */
 
 .panel-backdrop {
