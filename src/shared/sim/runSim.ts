@@ -5,17 +5,18 @@
 // seeded — same seed + same policy = identical summary; the determinism tests
 // and the balance sandbox both ride on that.
 
-import type { Hero } from '../delve';
+import type { Hero, HeroClass } from '../delve';
 import { deriveStats, type DerivedStats } from '../content/gear';
 import { unlockedAbilities } from '../content/actives';
 import { classDef } from '../content/classes';
 import { normalizeRotationOrder } from '../combat/rotation';
-import { TUNING } from '../content/tuning';
 import { CombatEngine, type CombatEvent } from '../combat/engine';
 import type { GearItem, GearSlot } from '../delve';
 
 export interface SimOptions {
   seed: number;
+  /** Which class to simulate (default 'squire'). */
+  heroClass?: HeroClass;
   /** Hero level (derives stats via the same deriveStats the game uses). */
   level?: number;
   /** Equipped gear (empty = naked class baseline). */
@@ -54,13 +55,17 @@ export interface RunSummary {
 const DEFAULT_MAX_SIM_MS = 60 * 60 * 1000; // one simulated hour — generous wall
 
 /** Build the minimal Hero the engine needs from class + level + gear. */
-export function simHero(level: number, equipped: Partial<Record<GearSlot, GearItem>>): {
+export function simHero(
+  level: number,
+  equipped: Partial<Record<GearSlot, GearItem>>,
+  heroClass: HeroClass = 'squire',
+): {
   hero: Hero;
   derived: DerivedStats;
 } {
-  const derived = deriveStats('squire', level, equipped);
-  const maxMana = TUNING.hero.baseMana + TUNING.hero.manaPerLevel * (level - 1);
-  const cls = classDef('squire');
+  const derived = deriveStats(heroClass, level, equipped);
+  const maxMana = derived.maxMana;
+  const cls = classDef(heroClass);
   const hero: Hero = {
     class: cls.id, level, xp: 0, xpToNext: 0,
     hp: derived.maxHp, maxHp: derived.maxHp,
@@ -78,7 +83,7 @@ export function simHero(level: number, equipped: Partial<Record<GearSlot, GearIt
 /** Run one seeded, policy-driven run to completion. */
 export function runSim(opts: SimOptions): RunSummary {
   const level = Math.max(1, Math.floor(opts.level ?? 1));
-  const { hero, derived } = simHero(level, opts.equipped ?? {});
+  const { hero, derived } = simHero(level, opts.equipped ?? {}, opts.heroClass ?? 'squire');
   const rotationOrder = normalizeRotationOrder(opts.rotationOrder ?? [], hero.abilities);
   const engine = new CombatEngine({ hero, derived, seed: opts.seed, rotationOrder });
 

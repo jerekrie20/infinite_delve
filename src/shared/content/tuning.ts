@@ -9,12 +9,13 @@ export interface HeroTuning {
   /** xpToNext(level) = xpCurveBase * level ^ xpCurveExp. */
   xpCurveBase: number;
   xpCurveExp: number;
-  /** Base mana at level 1. */
-  baseMana: number;
-  /** Extra mana per level. */
-  manaPerLevel: number;
-  /** Fraction of max mana regenerated per second (0.04 = 4%/s). */
+  /** Fraction of max mana regenerated per second (0.04 = 4%/s). Gear/passive
+   *  manaRegenPct scales on top: regen = maxMana × this × (1 + manaRegenPct/100). */
   manaRegenPct: number;
+  /** Class innate-passive value budget at level 1 (heroInnatePassives). */
+  passiveBudgetBase: number;
+  /** Extra innate-passive budget per hero level. */
+  passiveBudgetPerLevel: number;
 }
 
 export interface MonsterTuning {
@@ -151,9 +152,9 @@ export const TUNING: Tuning = {
     levelCap: 100,
     xpCurveBase: 20,
     xpCurveExp: 1.5,
-    baseMana: 50,
-    manaPerLevel: 5,
     manaRegenPct: 0.04,
+    passiveBudgetBase: 3,
+    passiveBudgetPerLevel: 0.25,
   },
   monster: {
     // Gentle HP/attack scaling so a fixed-attack fresh hero reaches ~depth 10;

@@ -145,12 +145,24 @@ renderer of `CombatEvent`s; sim + tests run the same code).
 
 ## 🟢 Phase 3 — Classes & onboarding (D12-D13)
 
-- [ ] **Archer base kit** (needs attack speed) — fast attacks, crit/mark flavor
-- [ ] **Apprentice base kit** (needs statuses) — slow heavy hits, stun/DoT
-- [ ] Complete **Squire kit** to 5 abilities per the unlock schedule
+Logic core landed 2026-07-24: all 3 chains playable through the shared engine.
+Per-class base stats + attack intervals + mana in `classes.ts`; caster stats
+(abilityPowerPct / maxMana(+Pct) / manaRegenPct / cooldownReductionPct — 51
+stats now) with maxMana folded into `deriveStats`; the 15 option-1 ability rows
+in `actives.ts` with the engine mechanics they need (multi-hit, armor-pen,
+forced crit, self-shield %maxHp, AP-scaled ability damage, CDR, chance +
+potency status riders, basic-attack riders, status-dodge). `tests/classes.test.ts`
+(14 checks) covers derives, fixed passives, unlock schedule, determinism, and
+the new mechanics. NOTE: slots 4-5 unlock at L25/L45 by level alone — the
+Temple promotion GATE on those levels is Phase 5.
+
+- [x] **Archer base kit** (needs attack speed) — fast attacks, crit/mark flavor
+- [x] **Apprentice base kit** (needs statuses) — slow heavy hits, stun/DoT
+- [x] Complete **Squire kit** to 5 abilities per the unlock schedule
       (`hero-progression.md` table)
-- [ ] **Player passive slots** — wire class passive pools into `deriveStats()`
-      (pools exist in `passives.ts`, never applied)
+- [x] **Player passive slots** — wire class passive pools into `deriveStats()`
+      (FIXED per class/level — slot order = pool order, levels 1/12/35/60;
+      rng-free so deriveStats stays pure. `heroInnatePassives` in `passives.ts`)
 - [ ] **Class select screen** + hero-creation moment (all 3 bases, D13)
 - [ ] **Guided first run** — authored gentle seed d1-5, 2-3 inline prompts,
       skippable after prompt 1 (D35), first-extract celebration

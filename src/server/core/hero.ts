@@ -50,7 +50,7 @@ export function recompute(h: StoredHero): void {
 /** Shape a StoredHero into the client-facing Hero (adds derived stats). */
 export function toHero(h: StoredHero): Hero {
   const d = deriveStats(h.class, h.level, h.equipped);
-  const maxMana = TUNING.hero.baseMana + TUNING.hero.manaPerLevel * (h.level - 1);
+  const maxMana = d.maxMana; // seeded from the class + folded maxManaPct gear
   return {
     class: h.class,
     level: h.level,

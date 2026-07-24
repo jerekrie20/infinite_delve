@@ -61,6 +61,12 @@ export type StatId =
   | 'hpRegenPct'
   // ── Combat clock (structural — read by the attack timer) ───────
   | 'attackSpeedPct'
+  // ── Caster (structural — read by ability dispatch / mana tick) ──
+  | 'abilityPowerPct'
+  | 'maxMana'
+  | 'maxManaPct'
+  | 'manaRegenPct'
+  | 'cooldownReductionPct'
   // ── Status appliers (behavioral — apply catalog statuses) ──────
   | 'burnChance'
   | 'bleedChance'
@@ -103,6 +109,11 @@ export type DerivedId =
   | 'blockChance'
   // Combat v2 (Phase 1): clock read + status framework stats
   | 'attackSpeedPct'
+  // Caster (Phase 3): structural reads at ability dispatch / mana tick
+  | 'abilityPowerPct'
+  | 'maxMana'
+  | 'manaRegenPct'
+  | 'cooldownReductionPct'
   | 'poisonChance'
   | 'poisonDamage'
   | 'cleavePct'
@@ -126,6 +137,7 @@ export const DERIVED_IDS: DerivedId[] = [
   'counterAttackPct', 'reviveChance', 'critHeal', 'explodeOnKill',
   'blockChance',
   'attackSpeedPct',
+  'abilityPowerPct', 'maxMana', 'manaRegenPct', 'cooldownReductionPct',
   'poisonChance', 'poisonDamage', 'cleavePct', 'statusResist',
   'shieldLeechPct', 'startingShield', 'preemptiveStrike',
   'burnChance', 'bleedChance', 'slowOnHitPct', 'shockChance',
@@ -164,8 +176,9 @@ export interface StatDef {
   handler?: string;
 }
 
-/** The full catalog — 46 stats (41 + the Phase 1 combat-v2 five: attackSpeedPct
- *  + burn/bleed/slow/shock appliers). Order = display order in gear panel. */
+/** The full catalog — 51 stats (46 + the Phase 3 caster five: abilityPowerPct,
+ *  maxMana, maxManaPct, manaRegenPct, cooldownReductionPct). Order = display
+ *  order in gear panel. */
 export const STATS: Record<StatId, StatDef> = {
   // ═══════════════════════════════════════════════════════════════════
   // Core flat/pct (always live — the generic fold handles them)
@@ -407,6 +420,36 @@ export const STATS: Record<StatId, StatDef> = {
     id: 'attackSpeedPct', name: 'Attack Speed', abbr: 'AS', pct: true,
     target: 'attackSpeedPct', op: 'flat', perBudget: 0.25, band: [3, 8],
     value: 5, kind: 'flat', max: 50,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Caster stats (structural reads — stats-catalog Part B). The ability
+  // dispatch / mana tick read the derived total directly (same pattern as
+  // attackSpeedPct); no hook handler. Apprentice-line itemization.
+  // ═══════════════════════════════════════════════════════════════════
+  abilityPowerPct: {
+    id: 'abilityPowerPct', name: 'Ability Power', abbr: 'AP', pct: true,
+    target: 'abilityPowerPct', op: 'flat', perBudget: 0.25, band: [4, 10],
+    value: 5, kind: 'flat', max: 100,
+  },
+  maxMana: {
+    id: 'maxMana', name: 'Max Mana', abbr: 'MANA',
+    target: 'maxMana', op: 'flat', perBudget: 1.5, value: 1, kind: 'flat',
+  },
+  maxManaPct: {
+    id: 'maxManaPct', name: 'Max Mana %', abbr: 'MANA', pct: true,
+    target: 'maxMana', op: 'pct', perBudget: 0.6, band: [5, 12],
+    value: 4, kind: 'flat', max: 60,
+  },
+  manaRegenPct: {
+    id: 'manaRegenPct', name: 'Mana Regen', abbr: 'MP/s', pct: true,
+    target: 'manaRegenPct', op: 'flat', perBudget: 0.4, band: [5, 15],
+    value: 6, kind: 'flat', max: 100,
+  },
+  cooldownReductionPct: {
+    id: 'cooldownReductionPct', name: 'Cooldown Reduction', abbr: 'CDR', pct: true,
+    target: 'cooldownReductionPct', op: 'flat', perBudget: 0.25, band: [3, 8],
+    value: 5, kind: 'flat', max: 40,
   },
 
   // ═══════════════════════════════════════════════════════════════════

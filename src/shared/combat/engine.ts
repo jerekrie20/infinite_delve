@@ -9,7 +9,7 @@
 import type { GearItem, Hero, MonsterRarity } from '../delve';
 import { STATS, type DerivedId, type DerivedMap, type HookPoint, type StatId } from '../content/stats';
 import { HANDLERS, type Combatant, type HandlerResult, type StatusRequest } from '../content/handlers';
-import { ACTIVES, type Targeting } from '../content/actives';
+import { ACTIVES, type ActiveDef, type AbilityStatus, type Targeting } from '../content/actives';
 import { classDef } from '../content/classes';
 import { TUNING } from '../content/tuning';
 import { rollDrop } from '../content/items';
@@ -19,7 +19,7 @@ import { StepAccumulator, AttackTimer, effectiveIntervalMs } from './clock';
 import {
   applyStatus, tickStatuses, cleanseForNextFloor, cleanseAll,
   statusAtkPct, statusAttackSpeedPct, statusDefenseDelta, statusDamageTakenPct,
-  statusHealingTakenPct, isStunned, hasUndying, shockBonusPct, consumeShock,
+  statusHealingTakenPct, statusStatDelta, isStunned, hasUndying, shockBonusPct, consumeShock,
   addShield, absorbWithShield, shieldPool,
   STATUS_PRESETS,
   type ActiveStatus, type ApplierView, type ApplyContext, type ModQuantity, type StatusId,
@@ -504,7 +504,9 @@ export class CombatEngine {
       }
     }
     if (this.mana < this.heroInfo.maxMana) {
-      const manaRegen = Math.round(this.heroInfo.maxMana * TUNING.hero.manaRegenPct);
+      // Base 4%/s × (1 + gear/passive manaRegenPct) — stats-catalog formula.
+      const regenMult = 1 + (this.heroDerived.manaRegenPct ?? 0) / 100;
+      const manaRegen = Math.round(this.heroInfo.maxMana * TUNING.hero.manaRegenPct * regenMult);
       this.mana = Math.min(this.heroInfo.maxMana, this.mana + (manaRegen || 1));
     }
     for (const id of Object.keys(this.cooldowns)) {
@@ -547,43 +549,95 @@ export class CombatEngine {
     if (action.kind === 'basic') {
       const basicId = this.heroInfo.abilities.find((id) => ACTIVES[id]?.basic);
       const def = basicId ? ACTIVES[basicId] : undefined;
-      const target = this.pickTargets(def?.targeting ?? 'front')[0];
-      if (!target) return;
-      this.resolveHit(this.hero, target, {
-        mult: def?.damageMult ?? 1,
-        action: def?.name ?? 'attack',
-      });
+      if (!def) {
+        // No basic def (shouldn't happen) — a plain 100% swing at the front.
+        const target = this.pickTargets('front')[0];
+        if (target) this.resolveHit(this.hero, target, { mult: 1, action: 'attack' });
+        return;
+      }
+      this.resolveAbilityEffects(def, false);
       return;
     }
 
     const def = ACTIVES[action.abilityId]!;
     this.mana -= def.manaCost;
-    this.cooldowns[action.abilityId] = def.cooldownMs;
+    this.cooldowns[action.abilityId] = this.effectiveCooldownMs(def);
     this.emit({ type: 'cast', abilityId: action.abilityId });
+    this.resolveAbilityEffects(def, true);
+  }
 
-    // Damage component per targeting type.
-    if (def.damageMult !== undefined) {
-      for (const target of this.pickTargets(def.targeting ?? 'front')) {
-        if (target.hp <= 0) continue;
-        this.resolveHit(this.hero, target, { mult: def.damageMult, action: def.name });
-        if (this.phase !== 'fighting') return;
-      }
+  /** Effective cooldown after the hero's cooldownReductionPct (caster stat). */
+  private effectiveCooldownMs(def: ActiveDef): number {
+    const cdr = Math.min(100, this.heroDerived.cooldownReductionPct ?? 0);
+    return Math.round(def.cooldownMs * (1 - cdr / 100));
+  }
+
+  /** Resolve a hero ability/basic's effects: self-shield, then the damage
+   *  component (hits × targeting, armor-pen + forced-crit + AP scaling), then
+   *  its status riders. Shared by the basic-attack and rotation paths so every
+   *  ability rides ONE code path (bible §1.4). `isAbility` = a mana ability
+   *  (AP scales its damage); a basic attack does not scale with AP. */
+  private resolveAbilityEffects(def: ActiveDef, isAbility: boolean): void {
+    // Self Shield = % of maxHp (Shield Wall / Mana Shield / Aegis Oath).
+    if (def.shieldPctMaxHp) {
+      this.grantShield(this.hero, Math.round(this.hero.maxHp * def.shieldPctMaxHp / 100), def.id);
     }
-    // Status components.
-    for (const st of def.statuses ?? []) {
-      if (st.side === 'self') {
-        this.applyStatusTo(this.hero, this.hero, {
-          id: st.id, magnitude: st.magnitude, durationMs: st.durationMs,
-        }, def.id, true, 0, st.modTarget ? { modTarget: st.modTarget } : undefined);
-      } else {
+
+    // Damage component: `hits` repeats over the targeting selection.
+    if (def.damageMult !== undefined) {
+      const hits = Math.max(1, def.hits ?? 1);
+      const apMult = isAbility ? 1 + (this.heroDerived.abilityPowerPct ?? 0) / 100 : 1;
+      for (let h = 0; h < hits; h++) {
         for (const target of this.pickTargets(def.targeting ?? 'front')) {
           if (target.hp <= 0) continue;
+          this.resolveHit(this.hero, target, {
+            mult: def.damageMult, action: def.name,
+            ...(def.defIgnorePct ? { defIgnorePct: def.defIgnorePct } : {}),
+            ...(def.guaranteedCrit ? { forceCrit: true } : {}),
+            ...(apMult !== 1 ? { apMult } : {}),
+          });
+          if (this.phase !== 'fighting') return;
+        }
+      }
+    }
+
+    // Status riders — target-side lands on the current front selection.
+    this.applyAbilityStatuses(def, this.pickTargets(def.targeting ?? 'front'));
+  }
+
+  /** Apply an ability's status riders: `chance` gates a proc (Fire Bolt's 15%
+   *  Burn), `potencyMult` scales a DoT off the caster's attack, `magnitude`
+   *  overrides outright. Self statuses ignore `targets`. */
+  private applyAbilityStatuses(def: ActiveDef, targets: EngineEntity[]): void {
+    for (const st of def.statuses ?? []) {
+      if (st.chance !== undefined && this.rng() >= st.chance) continue;
+      const magnitude = this.abilityStatusMagnitude(st);
+      if (st.side === 'self') {
+        this.applyStatusTo(this.hero, this.hero, {
+          id: st.id, magnitude, durationMs: st.durationMs,
+        }, def.id, true, 0, st.modTarget ? { modTarget: st.modTarget } : undefined);
+      } else {
+        for (const target of targets) {
+          if (target.hp <= 0) continue;
           this.applyStatusTo(this.hero, target, {
-            id: st.id, magnitude: st.magnitude, durationMs: st.durationMs,
+            id: st.id, magnitude, durationMs: st.durationMs,
           }, def.id, false, 0, st.modTarget ? { modTarget: st.modTarget } : undefined);
         }
       }
     }
+  }
+
+  /** The magnitude an ability status applies: explicit override wins; else a
+   *  potencyMult scales the preset's default (computed off the caster); else
+   *  undefined (the preset decides). */
+  private abilityStatusMagnitude(st: AbilityStatus): number | undefined {
+    if (st.magnitude !== undefined) return st.magnitude;
+    if (st.potencyMult !== undefined) {
+      const preset = STATUS_PRESETS[st.id];
+      const base = preset.defaultMagnitude?.({ attack: this.hero.attack, derived: this.hero.derived }, 0) ?? 0;
+      return Math.round(base * st.potencyMult);
+    }
+    return undefined;
   }
 
   // ---- boss signatures (D39) -----------------------------------------------
@@ -740,7 +794,17 @@ export class CombatEngine {
   private resolveHit(
     attacker: EngineEntity,
     defender: EngineEntity,
-    opts: { mult: number; action: string; isRepeat?: boolean },
+    opts: {
+      mult: number;
+      action: string;
+      isRepeat?: boolean;
+      /** % of the defender's defense this hit ignores (armor pen). */
+      defIgnorePct?: number;
+      /** Force a critical strike (Deadeye) — skips the crit roll. */
+      forceCrit?: boolean;
+      /** Ability-power multiplier on base damage (1 = none; caster abilities). */
+      apMult?: number;
+    },
   ): void {
     // onAttack: execute, pierce, double-strike signal, poison applier.
     const onAtk = collectHook('onAttack', attacker, defender, 0, this.rng);
@@ -754,14 +818,17 @@ export class CombatEngine {
     const pierceDmg = onAtk.extraDmg !== undefined && onAtk.extraDmg > 0 ? onAtk.extraDmg : 0;
     const doubleSignal = onAtk.extraDmg === -1;
 
-    // Base damage: buffed attack × ability mult + pierce, vs live defense.
+    // Base damage: buffed attack × ability mult × ability-power + pierce, vs
+    // live defense (armor-pen reduces the defender's effective defense).
     const atkPctMod = 1 + statusAtkPct(attacker.statuses) / 100;
-    const baseAtk = Math.round(attacker.attack * atkPctMod * opts.mult) + pierceDmg;
-    const defense = Math.max(0, defender.defense + statusDefenseDelta(defender.statuses));
+    const apMult = opts.apMult ?? 1;
+    const baseAtk = Math.round(attacker.attack * atkPctMod * apMult * opts.mult) + pierceDmg;
+    let defense = Math.max(0, defender.defense + statusDefenseDelta(defender.statuses));
+    if (opts.defIgnorePct) defense *= 1 - Math.min(100, opts.defIgnorePct) / 100;
     let dmg = baseAtk * (1 - defense / 100);
     const v = TUNING.combat.damageVariance;
     dmg *= 1 - v + this.rng() * (2 * v);
-    const crit = this.rng() < attacker.critChance / 100;
+    const crit = opts.forceCrit === true || this.rng() < attacker.critChance / 100;
     if (crit) dmg *= attacker.critMultiplier;
 
     // Shock payoff: the next hit taken deals more, then the stacks are spent.
@@ -773,6 +840,16 @@ export class CombatEngine {
     // Fortify/Mark: ±% damage taken, read at the point of use.
     dmg *= 1 + statusDamageTakenPct(defender.statuses) / 100;
     let finalDmg = Math.max(1, Math.round(dmg));
+
+    // Status-granted dodge (Tumble's temporary +dodge, etc.) — an independent
+    // avoidance roll on top of the innate dodge handler. Only draws rng when a
+    // dodge-buff is actually live, so it never perturbs the base draw order.
+    const statusDodge = statusStatDelta(defender.statuses, 'dodgeChance');
+    if (statusDodge > 0 && this.rng() < statusDodge / 100) {
+      this.emit({ type: 'dodge', targetId: defender.id, sourceId: attacker.id });
+      this.recordHit(attacker.side, 'dodged', 0, false);
+      return;
+    }
 
     // Defender reaction: dodge (+counter) or block negate.
     const onDef = collectHook('onTakeDamage', defender, attacker, finalDmg, this.rng);

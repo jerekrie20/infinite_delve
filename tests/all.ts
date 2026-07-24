@@ -5,6 +5,7 @@
 import { summary } from './helpers';
 
 await import('./gear-derive.test');
+await import('./classes.test');
 await import('./items.test');
 await import('./frontier.test');
 await import('./waves.test');

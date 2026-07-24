@@ -10,9 +10,10 @@
 // Pattern mirrors gear affix pools (items.ts): pickN() from flat StatId[]
 // arrays, tier→count gating, affixValue() for scaling.
 
-import type { MonsterRarity } from '../delve';
+import type { HeroClass, MonsterRarity } from '../delve';
 import { STATS, type StatId } from './stats';
 import { type Rng, pickN, affixValue } from './items';
+import { TUNING } from './tuning';
 
 // ---- Tier + pool types --------------------------------------------------------
 
@@ -86,14 +87,30 @@ export const PASSIVE_POOLS: Record<string, PassivePool> = {
     },
   },
 
-  // ── Player class innate passives ───────────────────────────────────
-  // (staged — rolls when the class system gains passive support)
+  // ── Player class innate passives (class-kits.md "Passive pools") ────
+  // Applied to heroes via heroInnatePassives (fixed per class/level).
   squire: {
     id: 'squire',
     tiers: {
       tier1: ['hpRegen'],
       tier2: ['thornsPct', 'dodgeChance'],
       tier3: ['counterAttackPct', 'blockChance'],
+    },
+  },
+  archer: {
+    id: 'archer',
+    tiers: {
+      tier1: ['dodgeChance'],
+      tier2: ['attackSpeedPct', 'increasedCritPct'],
+      tier3: ['bleedChance', 'doubleStrikeChance'],
+    },
+  },
+  apprentice: {
+    id: 'apprentice',
+    tiers: {
+      tier1: ['manaRegenPct'],
+      tier2: ['abilityPowerPct', 'maxManaPct'],
+      tier3: ['burnChance', 'cooldownReductionPct'],
     },
   },
 };
@@ -178,7 +195,9 @@ export function rollMonsterPassives(
   return rollFromPool(poolId, rule.tiers, rule.count, budget, rng);
 }
 
-/** Roll innate passives for a player class at a given level (staged). */
+/** Roll innate passives for a player class at a given level (staged; the random
+ *  path — kept for future roguelike-variant classes. The live hero path is the
+ *  deterministic heroInnatePassives below). */
 export function rollPlayerPassives(
   poolId: string,
   level: number,
@@ -189,4 +208,57 @@ export function rollPlayerPassives(
   const rule = PLAYER_LEVEL_RULES[bracket];
   if (!rule || rule.tiers === 0) return {};
   return rollFromPool(poolId, rule.tiers, rule.count, budget, rng);
+}
+
+// ---- Live hero innate passives (fixed per class/level) ------------------------
+//
+// Design (hero-progression.md): a hero unlocks passive SLOTS at levels 1/12/35/60.
+// Each slot grants ONE passive from its class pool. Owner decision (2026-07-24):
+// FIXED per class/level — slot k gets the k-th passive in pool order (tier1 →
+// tier2 → tier3 flattened), so lower slots draw low tiers and higher slots draw
+// high tiers, matching the level gates. No randomness, nothing stored on the
+// hero, no schema bump — deriveStats folds these in like a virtual gear piece.
+
+/** Levels at which a passive slot unlocks (hero-progression.md unlock table). */
+export const PLAYER_PASSIVE_SLOT_LEVELS = [1, 12, 35, 60] as const;
+
+/** How many passive slots are unlocked at a given level. */
+export function playerPassiveSlots(level: number): number {
+  return PLAYER_PASSIVE_SLOT_LEVELS.filter((lvl) => level >= lvl).length;
+}
+
+/** Deterministic value for a fixed innate passive (no rng — deriveStats is
+ *  pure). pct stats take the midpoint of their budget band; flat stats take
+ *  budget × perBudget. Both clamp to the stat's own max. */
+function fixedPassiveValue(stat: StatId, budget: number): number {
+  const def = STATS[stat];
+  let v: number;
+  if (def.pct) {
+    // Same band mapping as monsterPassiveValue, but midpoint instead of rolled.
+    const lo = Math.max(3, Math.round(budget * 1.2));
+    const hi = Math.max(lo + 5, Math.round(budget * 2.5));
+    v = Math.max(1, Math.round((lo + hi) / 2));
+  } else {
+    v = Math.max(1, Math.round(budget * def.perBudget));
+  }
+  return def.max !== undefined ? Math.min(v, def.max) : v;
+}
+
+/** The innate passive bonuses a class grants at a level — folded into
+ *  deriveStats. Empty for classes with no pool. Deterministic + rng-free. */
+export function heroInnatePassives(
+  classId: HeroClass,
+  level: number,
+): Partial<Record<StatId, number>> {
+  const pool = PASSIVE_POOLS[classId];
+  if (!pool) return {};
+  const ordered: StatId[] = [...pool.tiers.tier1, ...pool.tiers.tier2, ...pool.tiers.tier3];
+  const slots = playerPassiveSlots(level);
+  const budget = TUNING.hero.passiveBudgetBase + TUNING.hero.passiveBudgetPerLevel * level;
+  const out: Partial<Record<StatId, number>> = {};
+  for (let i = 0; i < slots && i < ordered.length; i++) {
+    const stat = ordered[i]!;
+    out[stat] = fixedPassiveValue(stat, budget);
+  }
+  return out;
 }

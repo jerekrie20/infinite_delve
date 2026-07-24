@@ -9,6 +9,7 @@ import { STATS, STAT_IDS, DERIVED_IDS, TARGET_MAX, zeroDerived, type DerivedMap 
 import { SETS } from './sets';
 import { TUNING } from './tuning';
 import { gearScore } from './items';
+import { heroInnatePassives } from './passives';
 
 /** Anything that carries gear: a stash + the equipped slots. */
 export interface GearState {
@@ -106,6 +107,7 @@ export function deriveStats(
   // Base values seed the flat accumulators.
   flat.attack = cls.baseAttack + cls.attackPerLevel * (level - 1);
   flat.maxHp = cls.baseMaxHp + cls.hpPerLevel * (level - 1);
+  flat.maxMana = cls.baseMana + cls.manaPerLevel * (level - 1);
   flat.baseCritChance = TUNING.combat.critChance * 100; // innate 5% base crit
   flat.critMultiplier = TUNING.combat.critMultiplier;   // innate 1.5× multiplier
   flat.healOnKillPct = Math.round(TUNING.combat.healOnKillPct * 100); // innate 45% heal
@@ -115,6 +117,11 @@ export function deriveStats(
     if (!def || !val) return;
     (def.op === 'pct' ? pct : flat)[def.target] += val;
   };
+
+  // Class innate passives (D12/hero-progression passive slots): fixed per
+  // class/level, folded in like a virtual gear piece. rng-free so deriveStats
+  // stays pure + deterministic (see heroInnatePassives in passives.ts).
+  for (const [id, val] of Object.entries(heroInnatePassives(classId, level))) add(id, val);
 
   const setCounts: Record<string, number> = {};
   for (const item of Object.values(equipped)) {

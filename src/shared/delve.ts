@@ -7,7 +7,7 @@ import type { StatId } from './content/stats';
 
 // ---- Hero & gear ----------------------------------------------------------
 
-export type HeroClass = 'squire';
+export type HeroClass = 'squire' | 'archer' | 'apprentice';
 
 export type GearSlot =
   | 'head'
