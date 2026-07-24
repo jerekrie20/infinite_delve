@@ -38,14 +38,19 @@ Per template: base + idle(4f) + attack-or-cast(4f). Bosses add signature
 pose. Recolor-from-parent is acceptable within a theme (Scout→Brute);
 bosses always bespoke (they're checkpoint moments — sprite priority #1).
 
+**✅ ALL 6 THEMES DONE 2026-07-23** — 20 templates + 6 bosses, grim-glow static
+side sprites (facing west) via `create_map_object`, `public/monsters/<id>.png`;
+no frame-anim yet (lane uses tween bob/hit). Wired: each template's `sprite` key
+= its id; `LaneScene.SPRITE_SPECS` origins from `scratchpad/bbox.mjs`.
+
 | Theme | Templates | Boss | Phase |
 |-------|-----------|------|-------|
-| Goblin Camp | Scout ✅(`b15d4ed6…` as goblin) · Brute ⬜ · Shaman ⬜ | Chieftain ⬜ | 2 |
-| Crypt | Skeleton ⬜ · Captain ⬜ · Ghoul ⬜ | Necromancer ⬜ | 2 |
-| Warrens | Giant Rat ✅(`5aeeebaf…`) · Plague Rat ⬜ · Tunnel Horror ⬜ | Broodmother ⬜ | 2 |
-| Deep | Wraith ⬜ · Deep Stalker ⬜ · Gloom Caller ⬜ | The Hollow King ⬜ | 2-4 |
-| Volcanic | Magma Imp ⬜ · Cinder Brute ⬜ · Flame Adept ⬜ | Pyre Tyrant ⬜ | 4-5 |
-| Abyss | Void Spawn ⬜ · Abyss Knight ⬜ · Null Witch ⬜ | Herald of the Abyss ⬜ | 5 |
+| Goblin Camp | ✅ Scout · Brute · Shaman | ✅ Chieftain | 2 |
+| Crypt | ✅ Skeleton · Captain · Ghoul | ✅ Necromancer | 2 |
+| Warrens | ✅ Giant Rat · Plague Rat · Tunnel Horror | ✅ Broodmother | 2 |
+| Deep | ✅ Wraith · Deep Stalker · Gloom Caller | ✅ The Hollow King | 2-4 |
+| Volcanic | ✅ Magma Imp · Cinder Brute · Flame Adept | ✅ Pyre Tyrant | 4-5 |
+| Abyss | ✅ Void Spawn · Abyss Knight · Null Witch | ✅ Herald of the Abyss | 5 |
 
 ## 3. Gear layers — paper-doll ([[gear-catalog]] × [[ART_BIBLE]] §4)
 
@@ -71,8 +76,8 @@ jewelry — glint only). Phase 5.
 
 | Batch | Count | Phase |
 |-------|-------|-------|
-| Statuses ([[status-effects]]) | 15 | 1 (framework HUD needs them) |
-| Elite/boss passive badges (D34: thorns, revive, execute…) | ~12 | 1-2 (spawn readability) |
+| Statuses ([[status-effects]]) | ✅ 16 (15 + empowered) | 1 — DONE 2026-07-23, `public/icons/` |
+| Elite/boss passive badges (D34: thorns, revive, execute…) | ✅ 11 | 1-2 — DONE 2026-07-23, `public/icons/` |
 | Consumables | 4 | 4 |
 | Abilities — option-1 column | 15 | 3 |
 | Abilities — options 2-4 | 45 | with their content (3-5) |
@@ -82,6 +87,17 @@ jewelry — glint only). Phase 5.
 7 backdrops (base camp + 6 themes) + **6 boss-room variants + 1 boss door
 sprite (D31)** + 2-3 decor sprites each (~14). Phase 2 for themes 1-3 +
 base camp + their boss rooms; later themes with their content.
+
+**Approach chosen 2026-07-23 (Goblin Camp slice):** backdrops are NOT single
+800×640 paintings (create_map_object caps at 400px + only does centered-subject-
+on-transparent). Instead a backdrop = code-drawn themed gradient + glow (ART_BIBLE
+§3 palette table, all 6 themes in `LaneScene.THEME_PALETTES`) + 2-3 generated
+decor prop sprites (`public/decor/`). Boss-room variant (D31) = same theme with
+`boss=true`: doused/darkened gradient, intensified glow, side vignette, decor
+tinted cold — no separate boss-room backdrop asset needed. Boss "door" transition
+already exists in code (`bossDoorTransition()`). ✅ ALL 6 themes done 2026-07-23 —
+2 decor props each in `public/decor/` (a glow-source + a prop), wired in
+`LaneScene.THEME_DECOR` with bbox origins.
 
 ## 6. UI atlas additions
 

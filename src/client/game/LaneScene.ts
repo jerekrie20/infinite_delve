@@ -37,7 +37,7 @@ interface CharSpec {
   nativeH: number;
   displayH: number;
 }
-const HERO_SPEC: CharSpec = { key: 'hero', originX: 0.5331, originY: 0.875, nativeH: 103, displayH: 150 };
+const HERO_SPEC: CharSpec = { key: 'hero', originX: 0.5136, originY: 0.75, nativeH: 90, displayH: 150 };
 const MONSTER_SPECS: Record<string, CharSpec> = {
   grunt: { key: 'goblin', originX: 0.5147, originY: 0.8824, nativeH: 101, displayH: 124 },
   swarm: { key: 'rat', originX: 0.5221, originY: 0.8676, nativeH: 97, displayH: 140 },
@@ -45,6 +45,145 @@ const MONSTER_SPECS: Record<string, CharSpec> = {
   caster: { key: 'goblin', originX: 0.5147, originY: 0.8824, nativeH: 101, displayH: 124 },
 };
 const specScale = (s: CharSpec): number => s.displayH / s.nativeH;
+
+/** Per-TEMPLATE sprite specs, keyed by a monster template's `sprite` field
+ *  (roster.md). Origins from scratchpad/bbox.mjs (opaque center + feet). Falls
+ *  back to the kind-based MONSTER_SPECS below for templates without bespoke art.
+ *  Goblin Camp theme (D25) authored 2026-07-23. */
+const SPRITE_SPECS: Record<string, CharSpec> = {
+  goblin_scout: { key: 'goblin_scout', originX: 0.4375, originY: 0.9375, nativeH: 108, displayH: 128 },
+  goblin_brute: { key: 'goblin_brute', originX: 0.4805, originY: 0.9375, nativeH: 111, displayH: 150 },
+  goblin_shaman: { key: 'goblin_shaman', originX: 0.4727, originY: 0.9375, nativeH: 117, displayH: 134 },
+  goblin_chief: { key: 'goblin_chief', originX: 0.4969, originY: 0.925, nativeH: 142, displayH: 150 },
+  // Crypt (11-20)
+  skeleton: { key: 'skeleton', originX: 0.3789, originY: 0.9688, nativeH: 120, displayH: 130 },
+  skeleton_capt: { key: 'skeleton_capt', originX: 0.4961, originY: 0.9609, nativeH: 112, displayH: 148 },
+  ghoul: { key: 'ghoul', originX: 0.4961, originY: 0.9766, nativeH: 121, displayH: 128 },
+  necromancer: { key: 'necromancer', originX: 0.475, originY: 0.9563, nativeH: 144, displayH: 150 },
+  // Warrens (21-30)
+  giant_rat: { key: 'giant_rat', originX: 0.5195, originY: 0.9063, nativeH: 95, displayH: 112 },
+  plague_rat: { key: 'plague_rat', originX: 0.5586, originY: 0.9063, nativeH: 99, displayH: 112 },
+  tunnel_horror: { key: 'tunnel_horror', originX: 0.4922, originY: 0.9609, nativeH: 117, displayH: 148 },
+  broodmother: { key: 'broodmother', originX: 0.5125, originY: 0.9187, nativeH: 134, displayH: 150 },
+  // Deep (31-40)
+  wraith: { key: 'wraith', originX: 0.5195, originY: 0.9063, nativeH: 106, displayH: 138 },
+  deep_stalker: { key: 'deep_stalker', originX: 0.4766, originY: 0.9922, nativeH: 122, displayH: 132 },
+  gloom_caller: { key: 'gloom_caller', originX: 0.4883, originY: 0.9609, nativeH: 109, displayH: 132 },
+  hollow_king: { key: 'hollow_king', originX: 0.5156, originY: 0.9563, nativeH: 148, displayH: 155 },
+  // Volcanic (41-50)
+  magma_imp: { key: 'magma_imp', originX: 0.4922, originY: 0.9453, nativeH: 118, displayH: 122 },
+  cinder_brute: { key: 'cinder_brute', originX: 0.4961, originY: 0.9609, nativeH: 116, displayH: 150 },
+  flame_adept: { key: 'flame_adept', originX: 0.4375, originY: 0.9531, nativeH: 119, displayH: 134 },
+  pyre_tyrant: { key: 'pyre_tyrant', originX: 0.5, originY: 0.9563, nativeH: 146, displayH: 158 },
+  // Abyss (51-60)
+  void_spawn: { key: 'void_spawn', originX: 0.5117, originY: 0.8203, nativeH: 85, displayH: 120 },
+  abyss_knight: { key: 'abyss_knight', originX: 0.4023, originY: 0.9609, nativeH: 119, displayH: 150 },
+  null_witch: { key: 'null_witch', originX: 0.4922, originY: 0.9375, nativeH: 112, displayH: 136 },
+  herald_abyss: { key: 'herald_abyss', originX: 0.5563, originY: 0.9688, nativeH: 153, displayH: 158 },
+};
+/** The two diegetic choice doors (D3/D33): tapping them in the cleared lane
+ *  extracts (left, amber "surface") or descends (right, theme-glow "deeper") —
+ *  replaces the old flat button band. Origins from bbox.mjs. */
+const DOOR = {
+  extract: { key: 'door_extract', x: 108, originX: 0.5594, originY: 0.8795, nativeH: 179, displayH: 190 },
+  descend: { key: 'door_descend', x: 700, originX: 0.525, originY: 0.8527, nativeH: 170, displayH: 190 },
+};
+
+/** Sprite keys for themes 2-6 whose PNG file name matches the key (preloaded in
+ *  a loop). Goblin Camp loads separately because its boss file name differs. */
+const THEME_MONSTER_KEYS = [
+  'skeleton', 'skeleton_capt', 'ghoul', 'necromancer',
+  'giant_rat', 'plague_rat', 'tunnel_horror', 'broodmother',
+  'wraith', 'deep_stalker', 'gloom_caller', 'hollow_king',
+  'magma_imp', 'cinder_brute', 'flame_adept', 'pyre_tyrant',
+  'void_spawn', 'abyss_knight', 'null_witch', 'herald_abyss',
+];
+
+/** Theme id for a depth (roster.md bands). Only goblin_camp has bespoke decor
+ *  art so far; the palette table covers all six so the "darkening descent"
+ *  (ART_BIBLE §3) reads even before later themes get their props. */
+function themeForDepth(depth: number): string {
+  if (depth <= 10) return 'goblin_camp';
+  if (depth <= 20) return 'crypt';
+  if (depth <= 30) return 'warrens';
+  if (depth <= 40) return 'deep';
+  if (depth <= 50) return 'volcanic';
+  return 'abyss';
+}
+
+/** Backdrop palette per theme (ART_BIBLE §3): base darkens with depth, each
+ *  theme owns one luminous glow accent. `glow` is the reward/light color. */
+interface ThemePalette { top: number; bottom: number; ground: number; groundEdge: number; glow: number; }
+const THEME_PALETTES: Record<string, ThemePalette> = {
+  goblin_camp: { top: 0x2c2016, bottom: 0x120c08, ground: 0x362718, groundEdge: 0x5a4326, glow: 0xff8a3d },
+  crypt: { top: 0x24243c, bottom: 0x0e0e18, ground: 0x2a2a3c, groundEdge: 0x45456a, glow: 0x9db8ff },
+  warrens: { top: 0x2a2410, bottom: 0x120f06, ground: 0x2e2a14, groundEdge: 0x4d4a1e, glow: 0xc4d24a },
+  deep: { top: 0x0e1a24, bottom: 0x05090e, ground: 0x122029, groundEdge: 0x1e3a44, glow: 0x2fd6c4 },
+  volcanic: { top: 0x241210, bottom: 0x0e0605, ground: 0x2a1512, groundEdge: 0x5a221a, glow: 0xff6a2a },
+  abyss: { top: 0x140a1e, bottom: 0x050308, ground: 0x160b22, groundEdge: 0x2e1a44, glow: 0xb060ff },
+};
+/** Decor props placed on a theme's backdrop (behind the fighters). `originY`
+ *  from bbox.mjs pins the prop's feet to the ground; `glow` (px radius) adds a
+ *  soft light pool for luminous props (braziers). */
+interface DecorSpec { key: string; file: string; x: number; scale: number; originY: number; glow?: number; }
+const THEME_DECOR: Record<string, DecorSpec[]> = {
+  goblin_camp: [
+    { key: 'decor_goblin_brazier', file: 'decor/goblin_brazier.png', x: 96, scale: 1.15, originY: 0.8542, glow: 150 },
+    { key: 'decor_goblin_totem', file: 'decor/goblin_totem.png', x: 712, scale: 1.05, originY: 0.9609 },
+  ],
+  crypt: [
+    { key: 'decor_crypt_bones', file: 'decor/crypt_bones.png', x: 96, scale: 1.1, originY: 0.9063, glow: 140 },
+    { key: 'decor_crypt_gravestone', file: 'decor/crypt_gravestone.png', x: 712, scale: 1.1, originY: 0.9583 },
+  ],
+  warrens: [
+    { key: 'decor_warrens_fungus', file: 'decor/warrens_fungus.png', x: 96, scale: 1.1, originY: 0.9063, glow: 140 },
+    { key: 'decor_warrens_nest', file: 'decor/warrens_nest.png', x: 712, scale: 1.1, originY: 0.8333 },
+  ],
+  deep: [
+    { key: 'decor_deep_crystal', file: 'decor/deep_crystal.png', x: 96, scale: 1.1, originY: 0.9375, glow: 160 },
+    { key: 'decor_deep_stalagmite', file: 'decor/deep_stalagmite.png', x: 712, scale: 1.05, originY: 0.9609 },
+  ],
+  volcanic: [
+    { key: 'decor_volcanic_vent', file: 'decor/volcanic_vent.png', x: 96, scale: 1.15, originY: 0.8854, glow: 170 },
+    { key: 'decor_volcanic_rock', file: 'decor/volcanic_rock.png', x: 712, scale: 1.1, originY: 0.8542 },
+  ],
+  abyss: [
+    { key: 'decor_abyss_crystal', file: 'decor/abyss_crystal.png', x: 96, scale: 1.1, originY: 0.9063, glow: 170 },
+    { key: 'decor_abyss_pillar', file: 'decor/abyss_pillar.png', x: 712, scale: 1.05, originY: 0.9609 },
+  ],
+};
+
+/** Status + passive-badge icons (24px grim-glow pixel art, public/icons/, D27).
+ *  Keyed by status id OR monster passive stat id; several passives reuse a
+ *  status icon where the concept is identical (hpRegen→regen, burnChance→burn,
+ *  slowOnHit→slow). Filenames are the deduped values loaded in preload(). */
+const ICON_FILE: Record<string, string> = {
+  // statuses (status-effects.md)
+  poison: 'poison', burn: 'burn', bleed: 'bleed', shock: 'shock', stun: 'stun',
+  slow: 'slow', weaken: 'weaken', armorBreak: 'armorBreak', mark: 'mark',
+  curse: 'curse', fortify: 'fortify', rage: 'rage', haste: 'haste',
+  regen: 'regen', undying: 'undying', statMod: 'empowered',
+  // elite/boss passive-badge stats (D34; roster passive pools)
+  thornsPct: 'thorns', blockChance: 'block', counterAttackPct: 'counter',
+  dodgeChance: 'dodge', doubleStrikeChance: 'doublestrike',
+  executeThreshold: 'execute', explodeOnKill: 'explode', lifestealPct: 'lifesteal',
+  reviveChance: 'revive', startingShield: 'barrier', statusResist: 'ward',
+  hpRegen: 'regen', hpRegenPct: 'regen', burnChance: 'burn', slowOnHitPct: 'slow',
+};
+const ICON_FILES_UNIQUE = Array.from(new Set(Object.values(ICON_FILE)));
+/** On-screen size of a status icon and the gap between icons in the row. */
+const STATUS_ICON_PX = 26;
+const STATUS_ICON_GAP = 30;
+
+/** Render depths (backdrop -20 / decor -12 sit below these). Fighters draw at
+ *  SPRITE_DEPTH with their contact shadow just beneath; HP bars sit ABOVE all
+ *  fighters so a big boss can't hide its own bar. */
+const SHADOW_DEPTH = -6;
+const SPRITE_DEPTH = 0;
+const BARS_DEPTH = 20;
+/** Texture key for a status/passive id, or undefined if it has no icon yet. */
+const iconKey = (id: string): string | undefined =>
+  ICON_FILE[id] ? `icon-${ICON_FILE[id]}` : undefined;
 
 /** Pack layout (D32): x slots by pack size, fronts first (engine orders the
  *  pack fronts-then-backs for casters). Back-row members render slightly
@@ -81,6 +220,14 @@ interface MonsterActor {
   spec: CharSpec;
   x: number;
   dead: boolean;
+  /** Y of the sprite's actual top (feet minus displayed opaque height, after
+   *  boss/row scale) — HP bar, name, and badges anchor to this so they clear
+   *  differently-sized sprites (bug: boss bars landed inside the sprite). */
+  topY: number;
+  /** Contact shadow planted at the feet so the sprite reads as grounded. */
+  shadow: Phaser.GameObjects.Ellipse;
+  /** Persistent elite/boss passive-badge icons above this actor (D34). */
+  badges: Phaser.GameObjects.Image[];
 }
 
 export class LaneScene extends Phaser.Scene {
@@ -102,8 +249,24 @@ export class LaneScene extends Phaser.Scene {
   private heroSprite!: Phaser.GameObjects.Image;
   private actors = new Map<string, MonsterActor>();
   private bars!: Phaser.GameObjects.Graphics;
-  private heroStatusText!: Phaser.GameObjects.Text;
+  /** Backdrop layer: a painted per-theme scene image (its foreground floor lands
+   *  on GROUND_Y) when one exists, else the code gradient on `bg`. `bg` also
+   *  carries the boss vignette + hero shadow. */
+  private bg!: Phaser.GameObjects.Graphics;
+  private bgImage: Phaser.GameObjects.Image | undefined;
+  private decorSprites: Phaser.GameObjects.GameObject[] = [];
+  private bgTheme = '';
+  private bgBoss = false;
+  /** Pooled hero status-icon row (max 6 icons + stack counts + "+N"). */
+  private heroStatusIcons: { icon: Phaser.GameObjects.Image; count: Phaser.GameObjects.Text }[] = [];
+  private heroStatusOverflow!: Phaser.GameObjects.Text;
   private choiceGroup!: Phaser.GameObjects.Container;
+  /** Pulsing glow behind each choice door + the risk readout, refreshed per
+   *  choice; the pulse tween is stopped when the choice is dismissed. */
+  private extractGlow!: Phaser.GameObjects.Ellipse;
+  private descendGlow!: Phaser.GameObjects.Ellipse;
+  private choiceRisk!: Phaser.GameObjects.Text;
+  private choicePulse: Phaser.Tweens.Tween | undefined;
   private fleeButton!: Phaser.GameObjects.Text;
 
   /** Enable verbose combat logging in the browser console. Activate with ?debug=1
@@ -152,6 +315,24 @@ export class LaneScene extends Phaser.Scene {
     this.load.image('hero', 'spr_hero.png');
     this.load.image('goblin', 'spr_goblin.png');
     this.load.image('rat', 'spr_rat.png');
+    // Goblin Camp theme sprites (grim-glow, D25/D29). The chief's file name
+    // differs from its sprite key, so these four load explicitly.
+    this.load.image('goblin_scout', 'monsters/goblin_scout.png');
+    this.load.image('goblin_brute', 'monsters/goblin_brute.png');
+    this.load.image('goblin_shaman', 'monsters/goblin_shaman.png');
+    this.load.image('goblin_chief', 'monsters/goblin_chieftain.png');
+    // Themes 2-6 (Crypt→Abyss): sprite key === file name, one texture each.
+    for (const k of THEME_MONSTER_KEYS) this.load.image(k, `monsters/${k}.png`);
+    for (const list of Object.values(THEME_DECOR)) {
+      for (const d of list) this.load.image(d.key, d.file);
+    }
+    this.load.image('door_extract', 'decor/extract_portal.png');
+    this.load.image('door_descend', 'decor/descend_gate.png');
+    // Painted per-theme scene backdrops (floor-inclusive); missing ones fall back
+    // to the code gradient. A missing file just logs — the scene still renders.
+    this.load.on('loaderror', () => undefined);
+    for (const t of Object.keys(THEME_PALETTES)) this.load.image(`backdrop_${t}`, `backdrops/${t}.png`);
+    for (const f of ICON_FILES_UNIQUE) this.load.image(`icon-${f}`, `icons/${f}.png`);
   }
 
   create(): void {
@@ -160,16 +341,25 @@ export class LaneScene extends Phaser.Scene {
     this.heroSprite = this.add
       .image(HERO_X, GROUND_Y, HERO_SPEC.key)
       .setOrigin(HERO_SPEC.originX, HERO_SPEC.originY)
-      .setScale(specScale(HERO_SPEC));
+      .setScale(specScale(HERO_SPEC))
+      .setDepth(SPRITE_DEPTH);
     this.idleBob(this.heroSprite, 0);
 
-    this.bars = this.add.graphics();
-    this.heroStatusText = this.add
-      .text(HERO_X, GROUND_Y - HERO_SPEC.displayH - 44, '', { fontFamily: 'Arial', fontSize: '22px' })
-      .setOrigin(0.5)
-      .setShadow(0, 2, '#000000', 3);
+    this.bars = this.add.graphics().setDepth(BARS_DEPTH);
+    // Hero status-icon row: a fixed pool of 6 icons + stack-count badges, shown/
+    // hidden each frame (real 24px grim-glow icons, D27 — replaces the emoji row).
+    for (let i = 0; i < 6; i++) {
+      const icon = this.add.image(0, 0, '__DEFAULT').setDisplaySize(STATUS_ICON_PX, STATUS_ICON_PX).setVisible(false);
+      const count = this.add
+        .text(0, 0, '', { fontFamily: 'Arial', fontSize: '15px', color: '#ffffff', fontStyle: 'bold' })
+        .setOrigin(0.5).setShadow(0, 1, '#000000', 3).setVisible(false);
+      this.heroStatusIcons.push({ icon, count });
+    }
+    this.heroStatusOverflow = this.add
+      .text(0, 0, '', { fontFamily: 'Arial', fontSize: '19px', color: '#cfc6e6', fontStyle: 'bold' })
+      .setOrigin(0, 0.5).setShadow(0, 2, '#000000', 3).setVisible(false);
 
-    this.buildChoiceUI();
+    this.buildLaneDoors();
     this.buildFleeButton();
 
     // Run-start checkpoint picker (D4): a hero with unlocked checkpoints
@@ -233,8 +423,7 @@ export class LaneScene extends Phaser.Scene {
         case 'bossWindUp': {
           const bossActor = this.actors.get(e.bossId);
           if (bossActor) {
-            this.floatNumber(bossActor.x, GROUND_Y - bossActor.spec.displayH - 70,
-              `⚡ ${e.signatureName}`, '#ffb020');
+            this.floatNumber(bossActor.x, bossActor.topY - 44, `⚡ ${e.signatureName}`, '#ffb020');
             // Telegraph flash (D31): the boss pulses red until the signature
             // fires (one attack beat) — readable even if the float is missed.
             if (!bossActor.dead) {
@@ -293,30 +482,42 @@ export class LaneScene extends Phaser.Scene {
     for (const actor of this.actors.values()) {
       this.tweens.killTweensOf(actor.sprite);
       actor.sprite.destroy();
+      actor.shadow.destroy();
+      for (const b of actor.badges) b.destroy();
     }
     this.actors.clear();
 
+    // Re-theme the lane for this floor's depth band + boss-lair state (D31).
+    this.updateBackdrop(this.engine.snapshot().depth, pack.some((v) => v.rarity === 'boss'));
+
     const xs = PACK_X[pack.length] ?? PACK_X[3]!;
     pack.forEach((view, i) => {
-      const spec = MONSTER_SPECS[view.kind] ?? MONSTER_SPECS.grunt!;
+      const spec = SPRITE_SPECS[view.sprite] ?? MONSTER_SPECS[view.kind] ?? MONSTER_SPECS.grunt!;
       const x = xs[i] ?? 620;
       const bossScale = view.rarity === 'boss' ? 1.3 : 1.0;
       const rowScale = view.row === 'back' ? 0.88 : 1.0;
       const scale = specScale(spec) * bossScale * rowScale;
+      // Displayed opaque height (feet→head) → the sprite's real top on-screen.
+      const effH = spec.displayH * bossScale * rowScale;
+      const topY = GROUND_Y - effH;
+      // Contact shadow planted at the feet (doesn't bob) so the sprite reads as
+      // standing on the ground. Width tracks the sprite's displayed footprint.
+      const shadowW = spec.nativeH * scale * 0.42;
+      const shadow = this.add.ellipse(x, GROUND_Y - 2, shadowW, shadowW * 0.28, 0x000000, 0.34)
+        .setDepth(SHADOW_DEPTH);
       const sprite = this.add
         .image(x, GROUND_Y, spec.key)
         .setOrigin(spec.originX, spec.originY)
         .setScale(scale * 0.6)
+        .setDepth(SPRITE_DEPTH)
         .setTint(view.rarity === 'elite' ? 0x4aa3ff : view.rarity === 'boss' ? 0xffb020 : 0xffffff);
       this.tweens.add({ targets: sprite, scale, duration: 220, ease: 'Back.out' });
       this.idleBob(sprite, 150 + i * 120);
-      this.actors.set(view.id, { view, sprite, spec, x, dead: false });
-      this.floatNumber(x, GROUND_Y - spec.displayH - 55, view.name, MONSTER_RARITY_COLORS[view.rarity] ?? '#ffffff');
-      // Elite/boss passive badges (D34): show stat names below the name.
-      if (view.passiveNames && view.passiveNames.length > 0) {
-        const badgeText = view.passiveNames.slice(0, 3).join(' · ');
-        this.floatNumber(x, GROUND_Y - spec.displayH - 82, badgeText, '#c9b8ff');
-      }
+      this.floatNumber(x, topY - 28, view.name, MONSTER_RARITY_COLORS[view.rarity] ?? '#ffffff');
+      // Elite/boss passive badges (D34): a persistent icon row above the name,
+      // so the fight's threats stay readable (was a fading text of raw stat ids).
+      const badges = this.buildPassiveBadges(view, x, topY - 60);
+      this.actors.set(view.id, { view, sprite, spec, x, dead: false, topY, shadow, badges });
     });
 
     // Boss floor: show the boss name banner at the top of the lane.
@@ -328,12 +529,27 @@ export class LaneScene extends Phaser.Scene {
     }
   }
 
+  /** Build the persistent passive-badge icon row for an elite/boss actor,
+   *  centered at `x` on baseline `y`. Stats without an icon are skipped. */
+  private buildPassiveBadges(view: PackMemberView, x: number, y: number): Phaser.GameObjects.Image[] {
+    const names = (view.passiveNames ?? []).filter((id) => {
+      const k = iconKey(id);
+      return k !== undefined && this.textures.exists(k);
+    }).slice(0, 4);
+    if (names.length === 0) return [];
+    const gap = 24;
+    const startX = x - (names.length * gap) / 2 + gap / 2;
+    return names.map((id, j) =>
+      this.add.image(startX + j * gap, y, iconKey(id)!).setDisplaySize(22, 22));
+  }
+
   private killActor(id: string): void {
     const actor = this.actors.get(id);
     if (!actor || actor.dead) return;
     actor.dead = true;
     this.tweens.killTweensOf(actor.sprite);
     this.tweens.add({ targets: actor.sprite, alpha: 0, y: actor.sprite.y + 14, duration: 260, ease: 'Quad.in' });
+    this.tweens.add({ targets: [...actor.badges, actor.shadow], alpha: 0, duration: 200, ease: 'Quad.in' });
   }
 
   private renderHit(e: Extract<CombatEvent, { type: 'hit' }>): void {
@@ -537,56 +753,56 @@ export class LaneScene extends Phaser.Scene {
 
   // ---- continue / extract choice ---------------------------------------------
 
-  private buildChoiceUI(): void {
-    const Y = GROUND_Y + 40;
-    this.choiceGroup = this.add.container(0, 0).setVisible(false).setDepth(100);
-    const bg = this.add.graphics();
-    bg.fillStyle(0x000000, 0.5);
-    bg.fillRect(0, Y - 50, DESIGN_W, 170);
-    this.choiceGroup.add(bg);
-    const label = this.add.text(DESIGN_W / 2, Y - 20, 'Continue or extract?', {
-      fontFamily: 'Arial', fontSize: '28px', color: '#ffffff', fontStyle: 'bold',
+  /** Diegetic choice doors (D3/D33): in the cleared lane the hero stands between
+   *  an amber extract portal (left) and a theme-lit descend gate (right). Tapping
+   *  a door takes the action — no UI band, the choice lives in the world. */
+  private buildLaneDoors(): void {
+    this.choiceGroup = this.add.container(0, 0).setVisible(false).setDepth(60);
+    const mkDoor = (d: typeof DOOR.extract, glowColor: number, label: string, labelColor: string,
+      onTap: () => void): { glow: Phaser.GameObjects.Ellipse; parts: Phaser.GameObjects.GameObject[] } => {
+      const glow = this.add.ellipse(d.x, GROUND_Y - d.displayH * 0.46, 210, 250, glowColor, 0.5);
+      const img = this.add.image(d.x, GROUND_Y, d.key)
+        .setOrigin(d.originX, d.originY)
+        .setScale(d.displayH / d.nativeH);
+      const cap = this.add.text(d.x, GROUND_Y + 28, label, {
+        fontFamily: 'Arial', fontSize: '25px', color: labelColor, fontStyle: 'bold',
+      }).setOrigin(0.5).setShadow(0, 2, '#000000', 5);
+      const zone = this.add.zone(d.x, GROUND_Y - d.displayH / 2, 185, d.displayH + 60)
+        .setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', onTap);
+      return { glow, parts: [glow, img, cap, zone] };
+    };
+    const extract = mkDoor(DOOR.extract, 0xffb020, '↑ EXTRACT', '#ffd77a', () => this.doExtract());
+    const descend = mkDoor(DOOR.descend, 0x9db8ff, 'DESCEND ↓', '#dfe6ff', () => this.doContinue());
+    this.extractGlow = extract.glow;
+    this.descendGlow = descend.glow;
+    this.choiceRisk = this.add.text(DESIGN_W / 2, GROUND_Y - 268, '', {
+      fontFamily: 'Arial', fontSize: '23px', color: '#e8e0f5', fontStyle: 'bold', align: 'center',
     }).setOrigin(0.5).setShadow(0, 2, '#000000', 5);
-    this.choiceGroup.add(label);
-    const contBg = this.add.graphics();
-    contBg.fillStyle(0x37b04f, 1);
-    contBg.fillRoundedRect(DESIGN_W / 2 + 40, Y + 16, 160, 64, 12);
-    this.choiceGroup.add(contBg);
-    const contText = this.add.text(DESIGN_W / 2 + 120, Y + 48, '▶ Continue', {
-      fontFamily: 'Arial', fontSize: '26px', color: '#ffffff', fontStyle: 'bold',
-    }).setOrigin(0.5);
-    this.choiceGroup.add(contText);
-    const extBg = this.add.graphics();
-    extBg.fillStyle(0xffb020, 1);
-    extBg.fillRoundedRect(DESIGN_W / 2 - 200, Y + 16, 160, 64, 12);
-    this.choiceGroup.add(extBg);
-    const extText = this.add.text(DESIGN_W / 2 - 120, Y + 48, '◀ Extract', {
-      fontFamily: 'Arial', fontSize: '26px', color: '#1a1a1a', fontStyle: 'bold',
-    }).setOrigin(0.5);
-    this.choiceGroup.add(extText);
-    const contZone = this.add.zone(DESIGN_W / 2 + 120, Y + 48, 160, 64)
-      .setInteractive({ useHandCursor: true });
-    contZone.on('pointerdown', () => this.doContinue());
-    this.choiceGroup.add(contZone);
-    const extZone = this.add.zone(DESIGN_W / 2 - 120, Y + 48, 160, 64)
-      .setInteractive({ useHandCursor: true });
-    extZone.on('pointerdown', () => this.doExtract());
-    this.choiceGroup.add(extZone);
+    this.choiceGroup.add([...extract.parts, ...descend.parts, this.choiceRisk]);
   }
 
   private showChoice(): void {
-    const label = this.choiceGroup.getAt(1) as Phaser.GameObjects.Text;
-    if (label) {
-      const s = this.engine.snapshot();
-      const risk = s.haulCount > 0
-        ? ` · 🎒${s.haulCount} gear · +${s.runGold}◆ unbanked`
-        : ` · +${s.runGold}◆ unbanked`;
-      label.setText(`Continue deeper or extract?${risk}`);
-    }
+    const s = this.engine.snapshot();
+    const risk = s.haulCount > 0
+      ? `unbanked +${s.runGold}◆  ·  🎒 ${s.haulCount} gear at risk`
+      : `unbanked +${s.runGold}◆`;
+    this.choiceRisk.setText(`Depth ${s.depth} cleared\n${risk}`);
+    // Descend gate glows in the NEXT floor's theme accent.
+    const pal = THEME_PALETTES[themeForDepth(s.depth + 1)] ?? THEME_PALETTES.goblin_camp!;
+    this.descendGlow.setFillStyle(pal.glow, 0.5);
     this.choiceGroup.setVisible(true);
+    this.choicePulse?.stop();
+    for (const glow of [this.extractGlow, this.descendGlow]) { glow.setScale(0.9); glow.setAlpha(0.45); }
+    this.choicePulse = this.tweens.add({
+      targets: [this.extractGlow, this.descendGlow],
+      scale: 1.08, alpha: 0.85, duration: 850, yoyo: true, repeat: -1, ease: 'Sine.inOut',
+    });
   }
 
   private hideChoice(): void {
+    this.choicePulse?.stop();
+    this.choicePulse = undefined;
     this.choiceGroup.setVisible(false);
   }
 
@@ -733,8 +949,9 @@ export class LaneScene extends Phaser.Scene {
     for (const m of this.snap.monsters) {
       const actor = this.actors.get(m.id);
       if (!actor || actor.dead || m.hp <= 0) continue;
-      this.bar(actor.x, GROUND_Y - actor.spec.displayH - 16, 88,
-        m.hp / m.maxHp, m.shield / m.maxHp, 0xff5470);
+      // Anchor to the sprite's real top (boss/row-scaled) so bars always clear
+      // the sprite, whatever its size.
+      this.bar(actor.x, actor.topY - 14, 88, m.hp / m.maxHp, m.shield / m.maxHp, 0xff5470);
     }
   }
 
@@ -755,34 +972,130 @@ export class LaneScene extends Phaser.Scene {
     }
   }
 
-  /** Status icon rows: emoji + stack counts under each HP bar (cap 6 + "+N");
-   *  real 24px icons land with the art phase-1/2 pass. */
+  /** Hero status-icon row under the HP bar: real 24px grim-glow icons + stack
+   *  counts, capped at 6 with a "+N" overflow (status-effects.md HUD rule).
+   *  Shield is excluded — it renders as a segment on the HP bar. */
   private drawStatuses(): void {
-    this.heroStatusText.setText(statusLine(this.snap.hero.statuses));
-    this.heroStatusText.setPosition(HERO_X, GROUND_Y - HERO_SPEC.displayH - 44);
+    const list = this.snap.hero.statuses.filter((s) => s.id !== 'shield');
+    const y = GROUND_Y - HERO_SPEC.displayH - 44;
+    const shown = Math.min(list.length, this.heroStatusIcons.length);
+    const totalW = shown * STATUS_ICON_GAP;
+    const startX = HERO_X - totalW / 2 + STATUS_ICON_GAP / 2;
+    for (let i = 0; i < this.heroStatusIcons.length; i++) {
+      const slot = this.heroStatusIcons[i]!;
+      const s = i < shown ? list[i] : undefined;
+      const key = s ? iconKey(s.id) : undefined;
+      if (s && key && this.textures.exists(key)) {
+        const x = startX + i * STATUS_ICON_GAP;
+        slot.icon.setTexture(key).setDisplaySize(STATUS_ICON_PX, STATUS_ICON_PX).setPosition(x, y).setVisible(true);
+        if (s.stacks > 1) slot.count.setText(String(s.stacks)).setPosition(x + 10, y + 10).setVisible(true);
+        else slot.count.setVisible(false);
+      } else {
+        slot.icon.setVisible(false);
+        slot.count.setVisible(false);
+      }
+    }
+    if (list.length > shown) {
+      this.heroStatusOverflow
+        .setText(`+${list.length - shown}`)
+        .setPosition(startX + shown * STATUS_ICON_GAP - STATUS_ICON_GAP / 2 + 6, y)
+        .setVisible(true);
+    } else {
+      this.heroStatusOverflow.setVisible(false);
+    }
     // Monster statuses ride the float texts (perf budget: one text per side).
   }
 
   // ---- visuals ---------------------------------------------------------------
 
-  private drawBackground(): void {
-    const g = this.add.graphics();
-    g.fillGradientStyle(0x241a3a, 0x241a3a, 0x120c1c, 0x120c1c, 1);
-    g.fillRect(0, 0, DESIGN_W, DESIGN_H);
-    g.fillStyle(0xffffff, 1);
-    // Cosmetic-only randomness (stars) — allowed outside the seeded engine.
-    for (let i = 0; i < 60; i++) {
-      const sx = Math.random() * DESIGN_W;
-      const sy = Math.random() * (GROUND_Y - 120);
-      g.fillCircle(sx, sy, Math.random() < 0.2 ? 2 : 1);
+  /** Re-theme the backdrop when the floor's theme or boss-status changes
+   *  (called from renderPack on each floorStart). */
+  private updateBackdrop(depth: number, boss: boolean): void {
+    const theme = themeForDepth(depth);
+    if (theme === this.bgTheme && boss === this.bgBoss && this.bg) return;
+    this.drawBackground(theme, boss);
+  }
+
+  /** Paint the themed backdrop (ART_BIBLE §3 "darkening descent") plus its decor
+   *  props. Boss floors (D31) douse the ambient light, intensify the theme glow,
+   *  and add a floor vignette so the lair reads as a threshold moment. */
+  private drawBackground(theme = 'goblin_camp', boss = false): void {
+    const pal = THEME_PALETTES[theme] ?? THEME_PALETTES.goblin_camp!;
+    if (!this.bg) this.bg = this.add.graphics().setDepth(-19);
+    const g = this.bg;
+    g.clear();
+    const backdropKey = `backdrop_${theme}`;
+    if (this.textures.exists(backdropKey)) {
+      // Painted scene backdrop (behind everything): its foreground floor is at
+      // the source image bottom, so scaling it to GROUND_Y lands the floor right
+      // under the fighters — the ground IS the backdrop. Boss lair = cool-dim.
+      if (!this.bgImage) this.bgImage = this.add.image(0, 0, backdropKey).setOrigin(0, 0).setDepth(-20);
+      const src = this.textures.get(backdropKey).getSourceImage();
+      const scale = Math.max(DESIGN_W / src.width, GROUND_Y / src.height);
+      this.bgImage.setTexture(backdropKey).setScale(scale)
+        .setTint(boss ? 0x7a8290 : 0xffffff).setVisible(true);
+      // Fill the strip below the floor (behind the bottom UI) with the theme dark.
+      g.fillStyle(pal.bottom, 1);
+      g.fillRect(0, GROUND_Y, DESIGN_W, DESIGN_H - GROUND_Y);
+    } else {
+      // Fallback for themes without a painted backdrop yet: gradient + shelf.
+      if (this.bgImage) this.bgImage.setVisible(false);
+      const top = boss ? Phaser.Display.Color.IntegerToColor(pal.top).darken(35).color : pal.top;
+      const bottom = boss ? Phaser.Display.Color.IntegerToColor(pal.bottom).darken(35).color : pal.bottom;
+      g.fillGradientStyle(top, top, bottom, bottom, 1);
+      g.fillRect(0, 0, DESIGN_W, GROUND_Y + 40);
+      g.fillStyle(pal.glow, boss ? 0.22 : 0.13);
+      g.fillEllipse(DESIGN_W / 2, GROUND_Y - 24, DESIGN_W * 1.15, 250);
+      g.fillStyle(pal.ground, 1);
+      g.fillRect(0, GROUND_Y, DESIGN_W, DESIGN_H - GROUND_Y);
+      g.fillStyle(pal.groundEdge, 1);
+      g.fillRect(0, GROUND_Y, DESIGN_W, 12);
+      g.fillStyle(pal.glow, boss ? 0.12 : 0.20);
+      g.fillRect(0, GROUND_Y, DESIGN_W, 3);
+      g.fillStyle(0x000000, 0.30);
+      g.fillRect(0, GROUND_Y + 66, DESIGN_W, DESIGN_H - GROUND_Y - 66);
     }
-    g.fillStyle(0x3a7a3f, 1);
-    g.fillRect(0, GROUND_Y, DESIGN_W, DESIGN_H - GROUND_Y);
-    g.fillStyle(0x54a95b, 1);
-    g.fillRect(0, GROUND_Y, DESIGN_W, 16);
-    // Soft ground shadow under the hero (monster shadows move with packs).
-    g.fillStyle(0x000000, 0.28);
-    g.fillEllipse(HERO_X, GROUND_Y - 2, 96, 22);
+    if (boss) {
+      // Lair vignette: side gutters darken inward.
+      g.fillStyle(0x000000, 0.5);
+      g.fillRect(0, 0, 130, GROUND_Y + 40);
+      g.fillRect(DESIGN_W - 130, 0, 130, GROUND_Y + 40);
+    }
+    // Soft contact shadow under the hero (monster shadows are per-actor sprites).
+    g.fillStyle(0x000000, 0.34);
+    g.fillEllipse(HERO_X, GROUND_Y - 2, 104, 24);
+    // A painted backdrop already carries the environment + glow, so foreground
+    // decor props would double up — only place them in the gradient fallback.
+    if (this.textures.exists(backdropKey)) this.clearDecor();
+    else this.placeDecor(theme, boss);
+    this.bgTheme = theme;
+    this.bgBoss = boss;
+  }
+
+  private clearDecor(): void {
+    for (const s of this.decorSprites) s.destroy();
+    this.decorSprites = [];
+  }
+
+  /** (Re)place the current theme's decor sprites behind the fighters, with a
+   *  soft glow pool under luminous props. Doused to a cold tint on boss floors. */
+  private placeDecor(theme: string, boss: boolean): void {
+    this.clearDecor();
+    for (const d of THEME_DECOR[theme] ?? []) {
+      if (!this.textures.exists(d.key)) continue;
+      if (d.glow && !boss) {
+        const glow = this.add.graphics().setDepth(-15);
+        glow.fillStyle((THEME_PALETTES[theme] ?? THEME_PALETTES.goblin_camp!).glow, 0.16);
+        glow.fillEllipse(d.x, GROUND_Y - 30, d.glow, d.glow * 0.85);
+        this.decorSprites.push(glow);
+      }
+      const img = this.add.image(d.x, GROUND_Y + 4, d.key)
+        .setOrigin(0.5, d.originY)
+        .setScale(d.scale)
+        .setDepth(-12);
+      if (boss) img.setTint(0x8890a0);
+      this.decorSprites.push(img);
+    }
   }
 
   private idleBob(target: Phaser.GameObjects.Image, delayMs: number): void {
@@ -871,20 +1184,6 @@ export class LaneScene extends Phaser.Scene {
       onComplete: () => b.destroy(),
     });
   }
-}
-
-/** Join a status list into one emoji line, capped at 6 icons + "+N" (HUD rule
- *  in status-effects.md). Shield is excluded — it renders on the HP bar. */
-function statusLine(statuses: Array<{ id: string; stacks: number }>): string {
-  const icons = statuses
-    .filter((s) => s.id !== 'shield')
-    .map((s) => {
-      const preset = STATUS_PRESETS[s.id as keyof typeof STATUS_PRESETS];
-      const icon = preset?.icon ?? '✨';
-      return s.stacks > 1 ? `${icon}${s.stacks}` : icon;
-    });
-  const shown = icons.slice(0, 6).join(' ');
-  return icons.length > 6 ? `${shown} +${icons.length - 6}` : shown;
 }
 
 // ---- Choice pacing (D3/D33) --------------------------------------------------

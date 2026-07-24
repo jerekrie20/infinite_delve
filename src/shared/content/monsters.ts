@@ -88,25 +88,25 @@ export interface MonsterTemplate {
 export const TEMPLATES: MonsterTemplate[] = [
   // ── Depths 1-10 · Goblin Camp (theme: goblinoid/brute) ──────────────────
   {
-    id: 'goblin_scout', name: 'Goblin Scout', sprite: 'goblin',
+    id: 'goblin_scout', name: 'Goblin Scout', sprite: 'goblin_scout',
     kind: 'grunt', baseStats: { hp: 8, attack: 4, defense: 0 },
     statMult: 1.0, passivePool: 'goblinoid',
     depthMin: 1, depthMax: 10, theme: 'goblin_camp',
   },
   {
-    id: 'goblin_brute', name: 'Goblin Brute', sprite: 'goblin',
+    id: 'goblin_brute', name: 'Goblin Brute', sprite: 'goblin_brute',
     kind: 'brute', baseStats: { hp: 20, attack: 6, defense: 2 },
     statMult: 1.3, passivePool: 'brute',
     depthMin: 1, depthMax: 10, theme: 'goblin_camp',
   },
   {
-    id: 'goblin_shaman', name: 'Goblin Shaman', sprite: 'goblin',
+    id: 'goblin_shaman', name: 'Goblin Shaman', sprite: 'goblin_shaman',
     kind: 'support', baseStats: { hp: 10, attack: 5, defense: 1 },
     statMult: 1.1, passivePool: 'goblinoid',
     depthMin: 1, depthMax: 10, theme: 'goblin_camp',
   },
   {
-    id: 'goblin_chief', name: 'Goblin Chieftain', sprite: 'goblin',
+    id: 'goblin_chief', name: 'Goblin Chieftain', sprite: 'goblin_chief',
     kind: 'brute', baseStats: { hp: 40, attack: 8, defense: 3 },
     statMult: 1.5, passivePool: 'goblinoid',
     depthMin: 1, depthMax: 10, theme: 'goblin_camp',
@@ -119,25 +119,25 @@ export const TEMPLATES: MonsterTemplate[] = [
 
   // ── Depths 11-20 · Crypt (theme: undead) ────────────────────────────────
   {
-    id: 'skeleton', name: 'Skeleton', sprite: 'goblin', // TODO: skeleton sprite
+    id: 'skeleton', name: 'Skeleton', sprite: 'skeleton',
     kind: 'grunt', baseStats: { hp: 12, attack: 5, defense: 1 },
     statMult: 1.1, passivePool: 'undead',
     depthMin: 11, depthMax: 20, theme: 'crypt', element: 'dark',
   },
   {
-    id: 'skeleton_capt', name: 'Skeleton Captain', sprite: 'goblin', // TODO
+    id: 'skeleton_capt', name: 'Skeleton Captain', sprite: 'skeleton_capt',
     kind: 'brute', baseStats: { hp: 25, attack: 7, defense: 3 },
     statMult: 1.4, passivePool: 'undead',
     depthMin: 11, depthMax: 20, theme: 'crypt', element: 'dark',
   },
   {
-    id: 'ghoul', name: 'Ghoul', sprite: 'goblin', // TODO: ghoul sprite
+    id: 'ghoul', name: 'Ghoul', sprite: 'ghoul',
     kind: 'swarm', baseStats: { hp: 9, attack: 6, defense: 0 },
     statMult: 1.2, passivePool: 'undead',
     depthMin: 11, depthMax: 20, theme: 'crypt', element: 'dark',
   },
   {
-    id: 'necromancer', name: 'Necromancer', sprite: 'goblin', // TODO: caster sprite
+    id: 'necromancer', name: 'Necromancer', sprite: 'necromancer',
     kind: 'caster', baseStats: { hp: 50, attack: 10, defense: 4 },
     statMult: 1.6, passivePool: 'undead',
     depthMin: 11, depthMax: 20, theme: 'crypt', element: 'dark',
@@ -150,25 +150,25 @@ export const TEMPLATES: MonsterTemplate[] = [
 
   // ── Depths 21-30 · Warrens (theme: swarm) ───────────────────────────────
   {
-    id: 'giant_rat', name: 'Giant Rat', sprite: 'rat',
+    id: 'giant_rat', name: 'Giant Rat', sprite: 'giant_rat',
     kind: 'swarm', baseStats: { hp: 6, attack: 3, defense: 0 },
     statMult: 1.3, passivePool: 'swarm',
     depthMin: 21, depthMax: 30, theme: 'warrens', element: 'nature',
   },
   {
-    id: 'plague_rat', name: 'Plague Rat', sprite: 'rat',
+    id: 'plague_rat', name: 'Plague Rat', sprite: 'plague_rat',
     kind: 'swarm', baseStats: { hp: 7, attack: 4, defense: 0 },
     statMult: 1.3, passivePool: 'swarm',
     depthMin: 21, depthMax: 30, theme: 'warrens', element: 'nature',
   },
   {
-    id: 'tunnel_horror', name: 'Tunnel Horror', sprite: 'rat',
+    id: 'tunnel_horror', name: 'Tunnel Horror', sprite: 'tunnel_horror',
     kind: 'brute', baseStats: { hp: 28, attack: 8, defense: 4 },
     statMult: 1.5, passivePool: 'brute',
     depthMin: 21, depthMax: 30, theme: 'warrens',
   },
   {
-    id: 'broodmother', name: 'Broodmother', sprite: 'rat',
+    id: 'broodmother', name: 'Broodmother', sprite: 'broodmother',
     kind: 'swarm', baseStats: { hp: 60, attack: 12, defense: 5 },
     statMult: 1.7, passivePool: 'swarm',
     depthMin: 21, depthMax: 30, theme: 'warrens', element: 'nature',
@@ -181,25 +181,25 @@ export const TEMPLATES: MonsterTemplate[] = [
 
   // ── Depths 31-40 · Deep (theme: deep) ───────────────────────────────────
   {
-    id: 'wraith', name: 'Wraith', sprite: 'goblin', // TODO: wraith sprite
+    id: 'wraith', name: 'Wraith', sprite: 'wraith',
     kind: 'caster', baseStats: { hp: 16, attack: 7, defense: 2 },
     statMult: 1.2, passivePool: 'deep',
     depthMin: 31, depthMax: 40, theme: 'deep', element: 'dark',
   },
   {
-    id: 'deep_stalker', name: 'Deep Stalker', sprite: 'goblin', // TODO
+    id: 'deep_stalker', name: 'Deep Stalker', sprite: 'deep_stalker',
     kind: 'grunt', baseStats: { hp: 18, attack: 8, defense: 2 },
     statMult: 1.3, passivePool: 'deep',
     depthMin: 31, depthMax: 40, theme: 'deep',
   },
   {
-    id: 'gloom_caller', name: 'Gloom Caller', sprite: 'goblin', // TODO
+    id: 'gloom_caller', name: 'Gloom Caller', sprite: 'gloom_caller',
     kind: 'caster', baseStats: { hp: 14, attack: 9, defense: 3 },
     statMult: 1.3, passivePool: 'deep',
     depthMin: 31, depthMax: 40, theme: 'deep', element: 'dark',
   },
   {
-    id: 'hollow_king', name: 'The Hollow King', sprite: 'goblin', // TODO: boss sprite
+    id: 'hollow_king', name: 'The Hollow King', sprite: 'hollow_king',
     kind: 'brute', baseStats: { hp: 70, attack: 13, defense: 6 },
     statMult: 1.8, passivePool: 'deep',
     depthMin: 31, depthMax: 40, theme: 'deep', element: 'dark',
@@ -212,25 +212,25 @@ export const TEMPLATES: MonsterTemplate[] = [
 
   // ── Depths 41-50 · Volcanic (theme: volcanic) ───────────────────────────
   {
-    id: 'magma_imp', name: 'Magma Imp', sprite: 'goblin', // TODO: imp sprite
+    id: 'magma_imp', name: 'Magma Imp', sprite: 'magma_imp',
     kind: 'swarm', baseStats: { hp: 10, attack: 6, defense: 1 },
     statMult: 1.3, passivePool: 'volcanic',
     depthMin: 41, depthMax: 50, theme: 'volcanic', element: 'fire',
   },
   {
-    id: 'cinder_brute', name: 'Cinder Brute', sprite: 'goblin', // TODO
+    id: 'cinder_brute', name: 'Cinder Brute', sprite: 'cinder_brute',
     kind: 'brute', baseStats: { hp: 32, attack: 10, defense: 5 },
     statMult: 1.5, passivePool: 'volcanic',
     depthMin: 41, depthMax: 50, theme: 'volcanic', element: 'fire',
   },
   {
-    id: 'flame_adept', name: 'Flame Adept', sprite: 'goblin', // TODO
+    id: 'flame_adept', name: 'Flame Adept', sprite: 'flame_adept',
     kind: 'caster', baseStats: { hp: 18, attack: 11, defense: 3 },
     statMult: 1.4, passivePool: 'volcanic',
     depthMin: 41, depthMax: 50, theme: 'volcanic', element: 'fire',
   },
   {
-    id: 'pyre_tyrant', name: 'Pyre Tyrant', sprite: 'goblin', // TODO: boss sprite
+    id: 'pyre_tyrant', name: 'Pyre Tyrant', sprite: 'pyre_tyrant',
     kind: 'brute', baseStats: { hp: 85, attack: 15, defense: 7 },
     statMult: 1.9, passivePool: 'volcanic',
     depthMin: 41, depthMax: 50, theme: 'volcanic', element: 'fire',
@@ -246,25 +246,25 @@ export const TEMPLATES: MonsterTemplate[] = [
 
   // ── Depths 51-60 · Abyss (theme: abyss) ─────────────────────────────────
   {
-    id: 'void_spawn', name: 'Void Spawn', sprite: 'goblin', // TODO: void sprite
+    id: 'void_spawn', name: 'Void Spawn', sprite: 'void_spawn',
     kind: 'grunt', baseStats: { hp: 20, attack: 10, defense: 3 },
     statMult: 1.3, passivePool: 'abyss',
     depthMin: 51, depthMax: 60, theme: 'abyss', element: 'dark',
   },
   {
-    id: 'abyss_knight', name: 'Abyss Knight', sprite: 'goblin', // TODO
+    id: 'abyss_knight', name: 'Abyss Knight', sprite: 'abyss_knight',
     kind: 'brute', baseStats: { hp: 36, attack: 12, defense: 6 },
     statMult: 1.6, passivePool: 'abyss',
     depthMin: 51, depthMax: 60, theme: 'abyss', element: 'dark',
   },
   {
-    id: 'null_witch', name: 'Null Witch', sprite: 'goblin', // TODO
+    id: 'null_witch', name: 'Null Witch', sprite: 'null_witch',
     kind: 'caster', baseStats: { hp: 20, attack: 13, defense: 4 },
     statMult: 1.5, passivePool: 'abyss',
     depthMin: 51, depthMax: 60, theme: 'abyss', element: 'dark',
   },
   {
-    id: 'herald_abyss', name: 'Herald of the Abyss', sprite: 'goblin', // TODO: boss sprite
+    id: 'herald_abyss', name: 'Herald of the Abyss', sprite: 'herald_abyss',
     kind: 'caster', baseStats: { hp: 100, attack: 17, defense: 8 },
     statMult: 2.0, passivePool: 'abyss',
     depthMin: 51, depthMax: 60, theme: 'abyss', element: 'dark',
