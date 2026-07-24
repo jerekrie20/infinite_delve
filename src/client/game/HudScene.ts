@@ -32,7 +32,10 @@ export interface HudSnapshot {
  *  events the scene emits. Replaces the old HTML/CSS HUD. */
 
 interface Slice { left: number; top: number; right: number; bottom: number }
-interface Role { frame: string; slice?: Slice; fill?: string }
+/** A role resolves to either an atlas frame (`frame` on the 'ui' sheet) or a
+ *  standalone grim-glow texture (`image`, its own PNG) — the restyle swaps the
+ *  wooden atlas frames for `image` roles without repacking the atlas. */
+interface Role { frame?: string; image?: string; slice?: Slice; fill?: string }
 interface UiMap { roles: Record<string, Role> }
 
 export interface HudHooks {
@@ -46,6 +49,16 @@ export interface HudHooks {
 }
 
 const DEFAULT_SLICE: Slice = { left: 8, top: 8, right: 8, bottom: 8 };
+
+/** Grim-glow HUD frame textures generated at runtime (Phaser generateTexture);
+ *  ui-map.json's restyled roles reference these keys via their `image` field.
+ *  Dark slate fill + a violet glow rim so the HUD reads as grim-glow over the
+ *  painted backdrops without clashing with any single theme's accent. */
+const HUD_PANEL_TEX = 'hudPanelTex';
+const HUD_SLOT_TEX = 'hudSlotTex';
+const HUD_FILL = 0x160f22;
+const HUD_RIM = 0x8a7ac0;
+const HUD_EDGE = 0x40355e;
 
 /** Six real equip slots shown inline + two locked placeholders = 8-cell grid. */
 const GEAR_SLOTS: GearSlot[] = ['hand1', 'hand2', 'body', 'head', 'legs', 'feet', 'belt', 'ring1', 'ring2', 'amulet'];
@@ -113,6 +126,7 @@ export class HudScene extends Phaser.Scene {
   create(): void {
     this.map = (this.cache.json.get('uimap') as UiMap)?.roles ?? {};
 
+    this.makeHudTextures();
     this.buildTopBar();
     this.buildPanel();
 
@@ -129,22 +143,54 @@ export class HudScene extends Phaser.Scene {
     this.repaintAll();
   }
 
+  /** Draw the grim-glow panel + slot frames once into runtime textures. The
+   *  panel is 9-sliced (22px rounded border, flat center); the slot is a socket
+   *  scaled per use. Both: dark slate fill, dark edge, inner violet glow rim. */
+  private makeHudTextures(): void {
+    if (!this.textures.exists(HUD_PANEL_TEX)) {
+      const g = this.add.graphics();
+      g.fillStyle(HUD_FILL, 0.94).fillRoundedRect(0, 0, 64, 64, 14);
+      g.lineStyle(3, HUD_EDGE, 1).strokeRoundedRect(1.5, 1.5, 61, 61, 13);
+      g.lineStyle(1, HUD_RIM, 0.5).strokeRoundedRect(4, 4, 56, 56, 11);
+      g.generateTexture(HUD_PANEL_TEX, 64, 64);
+      g.destroy();
+    }
+    if (!this.textures.exists(HUD_SLOT_TEX)) {
+      const g = this.add.graphics();
+      g.fillStyle(0x0d0916, 0.92).fillRoundedRect(0, 0, 96, 96, 12);
+      g.fillStyle(0x000000, 0.35).fillRoundedRect(8, 8, 80, 80, 8);
+      g.lineStyle(3, HUD_EDGE, 1).strokeRoundedRect(1.5, 1.5, 93, 93, 11);
+      g.lineStyle(1, HUD_RIM, 0.4).strokeRoundedRect(5, 5, 86, 86, 9);
+      g.generateTexture(HUD_SLOT_TEX, 96, 96);
+      g.destroy();
+    }
+  }
+
   // ---- role → object helpers -------------------------------------------------
+
+  /** Resolve a role to a (textureKey, frame) pair — a standalone `image` texture
+   *  when the role defines one (grim-glow restyle), else the 'ui' atlas frame. */
+  private roleTex(r: Role): { texture: string; frame: string | undefined } {
+    if (r.image && this.textures.exists(r.image)) return { texture: r.image, frame: undefined };
+    return { texture: 'ui', frame: r.frame };
+  }
 
   private nine(key: string, x: number, y: number, w: number, h: number): Phaser.GameObjects.NineSlice | null {
     const r = this.map[key];
     if (!r) { this.missing(x, y, w, h, key); return null; }
     const s = r.slice ?? DEFAULT_SLICE;
+    const t = this.roleTex(r);
     return this.add
-      .nineslice(x, y, 'ui', r.frame, w, h, s.left, s.right, s.top, s.bottom)
+      .nineslice(x, y, t.texture, t.frame, w, h, s.left, s.right, s.top, s.bottom)
       .setOrigin(0, 0);
   }
 
   private icon(key: string, cx: number, cy: number, box: number): Phaser.GameObjects.Image | null {
     const r = this.map[key];
     if (!r) { this.missing(cx - box / 2, cy - box / 2, box, box, key); return null; }
-    const img = this.add.image(cx, cy, 'ui', r.frame);
-    const f = this.textures.getFrame('ui', r.frame);
+    const t = this.roleTex(r);
+    const img = this.add.image(cx, cy, t.texture, t.frame);
+    const f = t.frame ? this.textures.getFrame(t.texture, t.frame) : this.textures.getFrame(t.texture);
     if (f) img.setScale(Math.min(box / f.width, box / f.height));
     return img;
   }
@@ -368,9 +414,16 @@ export class HudScene extends Phaser.Scene {
     this.skillsView.setVisible(which === 'skills');
     this.equipView.setVisible(which === 'equip');
     this.summaryView.setVisible(which === 'summary');
-    this.tabSkills.setTexture('ui', this.map[which === 'skills' ? 'tabActive' : 'tabInactive']?.frame);
-    this.tabSummary.setTexture('ui', this.map[which === 'summary' ? 'tabActive' : 'tabInactive']?.frame);
-    this.tabEquip.setTexture('ui', this.map[which === 'equip' ? 'tabActive' : 'tabInactive']?.frame);
+    const setTabTex = (n: Phaser.GameObjects.NineSlice, active: boolean): void => {
+      const t = this.roleTex(this.map[active ? 'tabActive' : 'tabInactive'] ?? {});
+      n.setTexture(t.texture, t.frame);
+      // When active/inactive share one image (restyle), tint carries the state:
+      // active reads full, inactive dims back.
+      n.setTint(active ? 0xffffff : 0x707088);
+    };
+    setTabTex(this.tabSkills, which === 'skills');
+    setTabTex(this.tabSummary, which === 'summary');
+    setTabTex(this.tabEquip, which === 'equip');
     this.tabSkillsText.setColor(which === 'skills' ? '#ffffff' : '#b9add6');
     this.tabSummaryText.setColor(which === 'summary' ? '#ffffff' : '#b9add6');
     this.tabEquipText.setColor(which === 'equip' ? '#ffffff' : '#b9add6');

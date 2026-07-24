@@ -53,11 +53,23 @@ fighters stand on it. One image per theme (6 total), boss-lair = same image +
 code darken/vignette. Sidescroller-tileset (16px Wang tiles) was the WRONG tool —
 too small/fiddly for a flat lane. Decor props stay as foreground.
 
-## 3. UI restyle — HUD matches grim-glow  ⬜
-- [ ] ⬜ Top bar (depth / bars / boss name) → grim-glow frame (`create_ui_asset`)
-- [ ] ⬜ Bottom section (skills / gear / bag / money) → themed panel frame
-- [x] ✅ Choice row already restyled → diegetic lane doors (2026-07-23)
-- [ ] ⬜ Extend `ui-sheet.png` + `ui-map.json` roles per ART_BIBLE §8
+## 3. UI restyle — HUD matches grim-glow  ✅ 2026-07-24
+- [x] ✅ Top bar + bottom panel + tabs → grim-glow frame (dark slate fill + violet glow rim)
+- [x] ✅ Skill + gear slots → grim-glow socket frame
+- [x] ✅ Choice row → diegetic lane doors (2026-07-23)
+- [x] ✅ `ui-map.json` roles gained an `image` field (standalone/runtime texture) that
+      overrides the wooden atlas `frame`; `HudScene.roleTex()` resolves it. Restyled
+      roles: panelBg, topbarBg, tabActive, tabInactive, skillSlot, gearSlot.
+
+**Impl note:** frames are DRAWN IN CODE via `HudScene.makeHudTextures()` →
+`generateTexture('hudPanelTex' | 'hudSlotTex')`, NOT generated art.
+`create_ui_asset` returns a whole multi-piece KIT SHEET (no per-piece coords) —
+too fiddly to slice reliably, so code-drawn grim-glow panels won it (full control,
+cohesive, zero slicing). Tabs share `hudPanelTex`; active/inactive differ by tint
+(0xffffff vs 0x707088) in `setTab`. Wooden atlas kept for the small icons + DOM
+overlays (settings/inventory/tooltip/buttons still use their atlas frames — restyle
+those later if they clash). Verified in-browser: 5 nine-slices on hudPanelTex,
+slots on hudSlotTex, tab tints correct.
 
 ## 4. Choice doors → PHYSICAL doors  🕓 later (user: "later thing, not now")
 - [ ] 🕓 Doors OPEN (frame anim) and the hero RUNS INTO them on descend/extract

@@ -4,20 +4,22 @@
   "roles": {
     "panelBg": {
       "frame": "sprite240",
+      "image": "hudPanelTex",
       "slice": {
-        "left": 8,
-        "top": 8,
-        "right": 8,
-        "bottom": 8
+        "left": 22,
+        "top": 22,
+        "right": 22,
+        "bottom": 22
       }
     },
     "topbarBg": {
       "frame": "sprite240",
+      "image": "hudPanelTex",
       "slice": {
-        "left": 8,
-        "top": 8,
-        "right": 8,
-        "bottom": 8
+        "left": 22,
+        "top": 22,
+        "right": 22,
+        "bottom": 22
       }
     },
     "settingsBg": {
@@ -67,20 +69,22 @@
     },
     "tabActive": {
       "frame": "sprite448",
+      "image": "hudPanelTex",
       "slice": {
-        "left": 8,
-        "top": 8,
-        "right": 8,
-        "bottom": 8
+        "left": 22,
+        "top": 22,
+        "right": 22,
+        "bottom": 22
       }
     },
     "tabInactive": {
       "frame": "sprite445",
+      "image": "hudPanelTex",
       "slice": {
-        "left": 8,
-        "top": 8,
-        "right": 8,
-        "bottom": 8
+        "left": 22,
+        "top": 22,
+        "right": 22,
+        "bottom": 22
       }
     },
     "iconButton": {
@@ -105,10 +109,12 @@
       "fill": "#b45bff"
     },
     "skillSlot": {
-      "frame": "sprite1149"
+      "frame": "sprite1149",
+      "image": "hudSlotTex"
     },
     "gearSlot": {
-      "frame": "sprite1168"
+      "frame": "sprite1168",
+      "image": "hudSlotTex"
     },
     "iconBag": {
       "frame": "sprite1300"

@@ -185,6 +185,7 @@
   },
   "active": "1e8e970e17162527",
   "lastOpenFiles": [
+    "art/StyleTODO.md.tmp.36788.1cc1e27e0e51",
     "art/StyleTODO.md",
     "art/asset-manifest.md.tmp.28916.1b18f77825d4",
     "SECURITY_PERF.md.tmp.35936.0894594ddb4b",
@@ -221,7 +222,6 @@
     "mechanics/03-combat/status-effects.md",
     "mechanics/03-combat/combat.md",
     "mechanics/02-monsters/roster.md",
-    "mechanics/02-monsters/monsters.md",
-    "mechanics/01-classes/class-kits.md"
+    "mechanics/02-monsters/monsters.md"
   ]
 }
