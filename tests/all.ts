@@ -19,5 +19,7 @@ await import('./hero-store.test');
 await import('./rate-limit.test');
 await import('./run-dedupe.test');
 await import('./run-queue.test');
+await import('./char-specs.test');
+await import('./sfx.test');
 
 summary();

@@ -12,6 +12,7 @@ import { initDailyPanel, refreshDailyPanel } from './ui/daily';
 import { initGearPanel, openGearPanel } from './ui/gear';
 import { showClassSelect } from './ui/classSelect';
 import { clearTutorial, initGuide, markTutorialDone } from './ui/guide';
+import { initSfx, isMuted, playSfx, toggleMute, unlockSfx } from './sfx';
 
 /** Show-once flag for the D13 class-select creation moment (device-local, like
  *  the tutorial + rotation state). Cleared on factory reset so it returns. */
@@ -164,6 +165,13 @@ async function boot(): Promise<void> {
     // Per-instance event wiring (lost when the old game is destroyed).
     g.events.on('run-resolved', () => void refreshDailyPanel());
     if (gearOnChange) g.events.on('hero-changed', gearOnChange);
+    // Level-up fanfare (D28): there is no levelUp combat event, so watch the
+    // hero the server hands back and fire when the level actually climbs.
+    let lastLevel = hero.level;
+    g.events.on('hero-changed', (h: Hero) => {
+      if (h.level > lastLevel) playSfx('levelUp');
+      lastLevel = h.level;
+    });
 
     (window as unknown as { __game?: Phaser.Game }).__game = g; // debug handle
     gameReady = true;
@@ -184,6 +192,21 @@ async function boot(): Promise<void> {
     attributeFilter: ['class', 'style'],
   });
   syncOverlayGate();
+
+  // SFX (D28): mobile webviews refuse audio until a real gesture, so the audio
+  // graph stays unbuilt until the first tap anywhere in the app.
+  initSfx(localStorage);
+  const muteButton = document.getElementById('btn-mute');
+  const paintMute = (): void => {
+    if (muteButton) muteButton.textContent = isMuted() ? '🔇 Sound: Off' : '🔊 Sound: On';
+  };
+  paintMute();
+  document.addEventListener('pointerdown', () => unlockSfx(), { once: true });
+  muteButton?.addEventListener('click', () => {
+    toggleMute(localStorage);
+    paintMute();
+    if (!isMuted()) playSfx('tap'); // audible confirmation of the new state
+  });
 
   // Modal panels remain HTML overlays, opened from the canvas HUD buttons.
   wirePanelClose('base-panel', 'base-close');

@@ -12,6 +12,12 @@ import { bossForDepth } from '../../shared/content/monsters';
 import { postEquip, postRunResult, postSell } from '../api';
 import { enqueueRun, newRunId } from '../runQueue';
 import { loadRotationOrder, saveRotationOrder } from '../rotation';
+import { playSfx } from '../sfx';
+import {
+  ALL_CHAR_SPECS, ANIM_ORDER, HERO_FALLBACK, MONSTER_SPECS, SPRITE_SPECS,
+  animKey, animRange, heroSpecFor, specFile, specScale,
+  type AnimId, type CharSpec,
+} from './charSpecs';
 
 /** The side-view combat lane — a RENDERER of the shared combat engine (bible
  *  §1.4). All combat truth (timers, rotation, packs, statuses, drops) lives in
@@ -27,60 +33,6 @@ const DESIGN_H = 1280;
 const GROUND_Y = 640;
 const HERO_X = 240;
 
-/** Per-character render spec, derived from each PixelLab sprite's opaque bounds:
- *  origin = (horizontal center, feet) in 0..1 so the sprite stands on GROUND_Y;
- *  displayH = on-screen height in design px; scale = displayH / nativeH. */
-interface CharSpec {
-  key: string;
-  originX: number;
-  originY: number;
-  nativeH: number;
-  displayH: number;
-}
-const HERO_SPEC: CharSpec = { key: 'hero', originX: 0.5136, originY: 0.75, nativeH: 90, displayH: 150 };
-const MONSTER_SPECS: Record<string, CharSpec> = {
-  grunt: { key: 'goblin', originX: 0.5147, originY: 0.8824, nativeH: 101, displayH: 124 },
-  swarm: { key: 'rat', originX: 0.5221, originY: 0.8676, nativeH: 97, displayH: 140 },
-  brute: { key: 'goblin', originX: 0.5147, originY: 0.8824, nativeH: 101, displayH: 140 },
-  caster: { key: 'goblin', originX: 0.5147, originY: 0.8824, nativeH: 101, displayH: 124 },
-};
-const specScale = (s: CharSpec): number => s.displayH / s.nativeH;
-
-/** Per-TEMPLATE sprite specs, keyed by a monster template's `sprite` field
- *  (roster.md). Origins from scratchpad/bbox.mjs (opaque center + feet). Falls
- *  back to the kind-based MONSTER_SPECS below for templates without bespoke art.
- *  Goblin Camp theme (D25) authored 2026-07-23. */
-const SPRITE_SPECS: Record<string, CharSpec> = {
-  goblin_scout: { key: 'goblin_scout', originX: 0.4375, originY: 0.9375, nativeH: 108, displayH: 128 },
-  goblin_brute: { key: 'goblin_brute', originX: 0.4805, originY: 0.9375, nativeH: 111, displayH: 150 },
-  goblin_shaman: { key: 'goblin_shaman', originX: 0.4727, originY: 0.9375, nativeH: 117, displayH: 134 },
-  goblin_chief: { key: 'goblin_chief', originX: 0.4969, originY: 0.925, nativeH: 142, displayH: 150 },
-  // Crypt (11-20)
-  skeleton: { key: 'skeleton', originX: 0.3789, originY: 0.9688, nativeH: 120, displayH: 130 },
-  skeleton_capt: { key: 'skeleton_capt', originX: 0.4961, originY: 0.9609, nativeH: 112, displayH: 148 },
-  ghoul: { key: 'ghoul', originX: 0.4961, originY: 0.9766, nativeH: 121, displayH: 128 },
-  necromancer: { key: 'necromancer', originX: 0.475, originY: 0.9563, nativeH: 144, displayH: 150 },
-  // Warrens (21-30)
-  giant_rat: { key: 'giant_rat', originX: 0.5195, originY: 0.9063, nativeH: 95, displayH: 112 },
-  plague_rat: { key: 'plague_rat', originX: 0.5586, originY: 0.9063, nativeH: 99, displayH: 112 },
-  tunnel_horror: { key: 'tunnel_horror', originX: 0.4922, originY: 0.9609, nativeH: 117, displayH: 148 },
-  broodmother: { key: 'broodmother', originX: 0.5125, originY: 0.9187, nativeH: 134, displayH: 150 },
-  // Deep (31-40)
-  wraith: { key: 'wraith', originX: 0.5195, originY: 0.9063, nativeH: 106, displayH: 138 },
-  deep_stalker: { key: 'deep_stalker', originX: 0.4766, originY: 0.9922, nativeH: 122, displayH: 132 },
-  gloom_caller: { key: 'gloom_caller', originX: 0.4883, originY: 0.9609, nativeH: 109, displayH: 132 },
-  hollow_king: { key: 'hollow_king', originX: 0.5156, originY: 0.9563, nativeH: 148, displayH: 155 },
-  // Volcanic (41-50)
-  magma_imp: { key: 'magma_imp', originX: 0.4922, originY: 0.9453, nativeH: 118, displayH: 122 },
-  cinder_brute: { key: 'cinder_brute', originX: 0.4961, originY: 0.9609, nativeH: 116, displayH: 150 },
-  flame_adept: { key: 'flame_adept', originX: 0.4375, originY: 0.9531, nativeH: 119, displayH: 134 },
-  pyre_tyrant: { key: 'pyre_tyrant', originX: 0.5, originY: 0.9563, nativeH: 146, displayH: 158 },
-  // Abyss (51-60)
-  void_spawn: { key: 'void_spawn', originX: 0.5117, originY: 0.8203, nativeH: 85, displayH: 120 },
-  abyss_knight: { key: 'abyss_knight', originX: 0.4023, originY: 0.9609, nativeH: 119, displayH: 150 },
-  null_witch: { key: 'null_witch', originX: 0.4922, originY: 0.9375, nativeH: 112, displayH: 136 },
-  herald_abyss: { key: 'herald_abyss', originX: 0.5563, originY: 0.9688, nativeH: 153, displayH: 158 },
-};
 /** The two diegetic choice doors (D3/D33): tapping them in the cleared lane
  *  extracts (left, amber "surface") or descends (right, theme-glow "deeper") —
  *  replaces the old flat button band. Origins from bbox.mjs. */
@@ -88,16 +40,6 @@ const DOOR = {
   extract: { key: 'door_extract', x: 108, originX: 0.5594, originY: 0.8795, nativeH: 179, displayH: 190 },
   descend: { key: 'door_descend', x: 700, originX: 0.525, originY: 0.8527, nativeH: 170, displayH: 190 },
 };
-
-/** Sprite keys for themes 2-6 whose PNG file name matches the key (preloaded in
- *  a loop). Goblin Camp loads separately because its boss file name differs. */
-const THEME_MONSTER_KEYS = [
-  'skeleton', 'skeleton_capt', 'ghoul', 'necromancer',
-  'giant_rat', 'plague_rat', 'tunnel_horror', 'broodmother',
-  'wraith', 'deep_stalker', 'gloom_caller', 'hollow_king',
-  'magma_imp', 'cinder_brute', 'flame_adept', 'pyre_tyrant',
-  'void_spawn', 'abyss_knight', 'null_witch', 'herald_abyss',
-];
 
 /** Theme id for a depth (roster.md bands). Only goblin_camp has bespoke decor
  *  art so far; the palette table covers all six so the "darkening descent"
@@ -216,10 +158,12 @@ const MONSTER_RARITY_COLORS: Record<string, string> = {
 /** One rendered pack member: sprite + layout info for floats/bars. */
 interface MonsterActor {
   view: PackMemberView;
-  sprite: Phaser.GameObjects.Image;
+  sprite: Phaser.GameObjects.Sprite;
   spec: CharSpec;
   x: number;
   dead: boolean;
+  /** Rarity tint (white/elite blue/boss gold) — restored after a hurt flash. */
+  tint: number;
   /** Y of the sprite's actual top (feet minus displayed opaque height, after
    *  boss/row scale) — HP bar, name, and badges anchor to this so they clear
    *  differently-sized sprites (bug: boss bars landed inside the sprite). */
@@ -246,7 +190,10 @@ export class LaneScene extends Phaser.Scene {
    *  continue delay so the result is readable. */
   private eventFloorShown = false;
 
-  private heroSprite!: Phaser.GameObjects.Image;
+  private heroSprite!: Phaser.GameObjects.Sprite;
+  /** Render spec for THIS hero's class — resolved once in init() so every
+   *  bar/float/status offset reads the same silhouette the lane draws. */
+  private heroSpec: CharSpec = HERO_FALLBACK;
   private actors = new Map<string, MonsterActor>();
   private bars!: Phaser.GameObjects.Graphics;
   /** Backdrop layer: a painted per-theme scene image (its foreground floor lands
@@ -288,6 +235,7 @@ export class LaneScene extends Phaser.Scene {
       gold: 0, bestDepth: 1, checkpoints: [1], stash: [], equipped: {},
     };
     if (data.idle) this.pendingIdle = data.idle;
+    this.heroSpec = heroSpecFor(this.hero.class);
     this.bankedGold = this.hero.gold;
     this.heroDerived = deriveStats(this.hero.class, this.hero.level, this.hero.equipped);
     this.rotationOrder = loadRotationOrder(localStorage, this.hero.abilities);
@@ -312,17 +260,18 @@ export class LaneScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image('hero', 'spr_hero.png');
-    this.load.image('goblin', 'spr_goblin.png');
-    this.load.image('rat', 'spr_rat.png');
-    // Goblin Camp theme sprites (grim-glow, D25/D29). The chief's file name
-    // differs from its sprite key, so these four load explicitly.
-    this.load.image('goblin_scout', 'monsters/goblin_scout.png');
-    this.load.image('goblin_brute', 'monsters/goblin_brute.png');
-    this.load.image('goblin_shaman', 'monsters/goblin_shaman.png');
-    this.load.image('goblin_chief', 'monsters/goblin_chieftain.png');
-    // Themes 2-6 (Crypt→Abyss): sprite key === file name, one texture each.
-    for (const k of THEME_MONSTER_KEYS) this.load.image(k, `monsters/${k}.png`);
+    // Every hero/monster character: an animated strip (create_character +
+    // animate_character, ART_BIBLE §5) loads as a spritesheet; art not yet
+    // regenerated still loads as a single static image.
+    for (const spec of ALL_CHAR_SPECS) {
+      if (spec.sheet) {
+        this.load.spritesheet(spec.key, specFile(spec), {
+          frameWidth: spec.sheet.frameSize, frameHeight: spec.sheet.frameSize,
+        });
+      } else {
+        this.load.image(spec.key, specFile(spec));
+      }
+    }
     for (const list of Object.values(THEME_DECOR)) {
       for (const d of list) this.load.image(d.key, d.file);
     }
@@ -336,14 +285,10 @@ export class LaneScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.registerAnims();
     this.drawBackground();
 
-    this.heroSprite = this.add
-      .image(HERO_X, GROUND_Y, HERO_SPEC.key)
-      .setOrigin(HERO_SPEC.originX, HERO_SPEC.originY)
-      .setScale(specScale(HERO_SPEC))
-      .setDepth(SPRITE_DEPTH);
-    this.idleBob(this.heroSprite, 0);
+    this.heroSprite = this.spawnActorSprite(this.heroSpec, HERO_X, specScale(this.heroSpec));
 
     this.bars = this.add.graphics().setDepth(BARS_DEPTH);
     // Hero status-icon row: a fixed pool of 6 icons + stack-count badges, shown/
@@ -399,11 +344,12 @@ export class LaneScene extends Phaser.Scene {
       switch (e.type) {
         case 'floorStart': this.renderPack(e.pack); break;
         case 'hit': this.renderHit(e); break;
-        case 'dodge': this.floatAt(e.targetId, 'DODGE', '#ffe066'); break;
-        case 'block': this.floatAt(e.targetId, 'BLOCK', '#4aa3ff'); break;
+        case 'dodge': this.floatAt(e.targetId, 'DODGE', '#ffe066'); playSfx('dodge'); break;
+        case 'block': this.floatAt(e.targetId, 'BLOCK', '#4aa3ff'); playSfx('dodge'); break;
         case 'cast': {
           const def = ACTIVES[e.abilityId];
-          if (def) this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 50, `${def.name.toUpperCase()}!`, '#ffd84a');
+          if (def) this.floatNumber(HERO_X, GROUND_Y - this.heroSpec.displayH - 50, `${def.name.toUpperCase()}!`, '#ffd84a');
+          playSfx('cast');
           break;
         }
         case 'statusApplied': {
@@ -427,6 +373,9 @@ export class LaneScene extends Phaser.Scene {
             // Telegraph flash (D31): the boss pulses red until the signature
             // fires (one attack beat) — readable even if the float is missed.
             if (!bossActor.dead) {
+              // Bosses with a generated signature pose play it here; the tint
+              // pulse stays either way as the colour-blind-safe read.
+              this.playOneShot(bossActor.sprite, bossActor.spec, 'signature');
               bossActor.sprite.setTint(0xff5470);
               this.tweens.add({
                 targets: bossActor.sprite,
@@ -445,9 +394,15 @@ export class LaneScene extends Phaser.Scene {
         case 'kill': {
           this.floatAt(e.targetId, `+${e.gold}◆`, '#ffe066');
           this.killActor(e.targetId);
+          playSfx('kill');
           break;
         }
-        case 'lootDrop': this.lootOrb(e.item); break;
+        case 'lootDrop':
+          this.lootOrb(e.item);
+          // Set/unique/epic+ get the riser; ordinary drops just thunk.
+          playSfx(e.item.unique || e.item.set || e.item.r === 'epic' || e.item.r === 'legendary'
+            ? 'lootRare' : 'loot');
+          break;
         case 'eventEncounter': {
           const icons: Record<string, string> = { shrine: '🙏', altar: '🔥', cache: '📦', lore: '📜' };
           // Events are a full banner + a longer pre-continue beat — the old
@@ -505,19 +460,16 @@ export class LaneScene extends Phaser.Scene {
       const shadowW = spec.nativeH * scale * 0.42;
       const shadow = this.add.ellipse(x, GROUND_Y - 2, shadowW, shadowW * 0.28, 0x000000, 0.34)
         .setDepth(SHADOW_DEPTH);
-      const sprite = this.add
-        .image(x, GROUND_Y, spec.key)
-        .setOrigin(spec.originX, spec.originY)
-        .setScale(scale * 0.6)
-        .setDepth(SPRITE_DEPTH)
-        .setTint(view.rarity === 'elite' ? 0x4aa3ff : view.rarity === 'boss' ? 0xffb020 : 0xffffff);
+      const tint = view.rarity === 'elite' ? 0x4aa3ff : view.rarity === 'boss' ? 0xffb020 : 0xffffff;
+      // Spawn small and pop to full size; animated characters run their idle
+      // loop from frame one, static art keeps the staggered bob.
+      const sprite = this.spawnActorSprite(spec, x, scale * 0.6, 150 + i * 120).setTint(tint);
       this.tweens.add({ targets: sprite, scale, duration: 220, ease: 'Back.out' });
-      this.idleBob(sprite, 150 + i * 120);
       this.floatNumber(x, topY - 28, view.name, MONSTER_RARITY_COLORS[view.rarity] ?? '#ffffff');
       // Elite/boss passive badges (D34): a persistent icon row above the name,
       // so the fight's threats stay readable (was a fading text of raw stat ids).
       const badges = this.buildPassiveBadges(view, x, topY - 60);
-      this.actors.set(view.id, { view, sprite, spec, x, dead: false, topY, shadow, badges });
+      this.actors.set(view.id, { view, sprite, spec, x, dead: false, tint, topY, shadow, badges });
     });
 
     // Boss floor: show the boss name banner at the top of the lane.
@@ -526,6 +478,7 @@ export class LaneScene extends Phaser.Scene {
       const bannerLines = [`⚔ BOSS FLOOR ${this.engine.snapshot().depth} ⚔`, boss.name];
       if (boss.signatureName) bannerLines.push(`Watch for: ${boss.signatureName}`);
       this.banner(bannerLines.join('\n'), '#ffb020', 2200);
+      playSfx('bossSpawn');
     }
   }
 
@@ -548,17 +501,29 @@ export class LaneScene extends Phaser.Scene {
     if (!actor || actor.dead) return;
     actor.dead = true;
     this.tweens.killTweensOf(actor.sprite);
+    // Death is a tween (fade + fall) per ART_BIBLE §5 — freeze the idle loop
+    // first so the corpse doesn't keep breathing on its way down.
+    actor.sprite.stop();
     this.tweens.add({ targets: actor.sprite, alpha: 0, y: actor.sprite.y + 14, duration: 260, ease: 'Quad.in' });
     this.tweens.add({ targets: [...actor.badges, actor.shadow], alpha: 0, duration: 200, ease: 'Quad.in' });
   }
 
   private renderHit(e: Extract<CombatEvent, { type: 'hit' }>): void {
-    // Attacker lunge: hero lunges right, monsters lunge left.
-    if (e.sourceId === 'hero') this.hitFx(this.heroSprite, 1);
+    // Attacker plays its attack animation and lunges: hero right, monsters left.
+    if (e.sourceId === 'hero') this.hitFx(this.heroSprite, this.heroSpec, 1);
     else {
       const src = this.actors.get(e.sourceId);
-      if (src && !src.dead) this.hitFx(src.sprite, -1);
+      if (src && !src.dead) this.hitFx(src.sprite, src.spec, -1);
     }
+    // Defender flinches — a short red flash on whoever just took the damage.
+    if (e.targetId === 'hero') this.hurtFx(this.heroSprite, 0xffffff);
+    else {
+      const tgt = this.actors.get(e.targetId);
+      if (tgt && !tgt.dead) this.hurtFx(tgt.sprite, tgt.tint);
+    }
+    // Hero's blow, the hero's crit, and a blow landing ON the hero each sound
+    // different — the player can read the fight with their eyes off the screen.
+    playSfx(e.targetId === 'hero' ? 'monsterHit' : e.crit ? 'crit' : 'hit');
     const label = e.crit ? `${e.dmg}!` : `${e.dmg}`;
     const color =
       e.targetId === 'hero' ? '#ff6b6b' : e.crit ? '#ffd84a' : '#ffffff';
@@ -579,6 +544,7 @@ export class LaneScene extends Phaser.Scene {
       const resp = result.resp;
       this.hero = resp.hero;
       this.bankedGold = resp.hero.gold;
+      playSfx('extract');
       const eq = resp.gained.itemsEquipped ? `  (${resp.gained.itemsEquipped} equipped)` : '';
       this.banner(`EXTRACTED\n+${resp.gained.gold}◆${gearLine}${eq}`, '#5bd06a');
     } else {
@@ -598,6 +564,7 @@ export class LaneScene extends Phaser.Scene {
       this.hero.gold += runGold;
       this.rederiveHero();
       this.bankedGold = this.hero.gold;
+      playSfx('extract');
       const syncNote = result.status === 'retryable' ? '\nrun saved — will sync' : '';
       this.banner(`EXTRACTED\n+${runGold}◆${gearLine}${syncNote}`, '#5bd06a');
     }
@@ -628,6 +595,7 @@ export class LaneScene extends Phaser.Scene {
     // Banner shows immediately for juice; the full recap CARD rides the
     // checkpoint panel below (D34) so it can actually be read. Server sync
     // happens during the display.
+    playSfx('death');
     this.banner(recapLines.join('\n'), '#ff5470', 1600);
 
     // Await the server response so this.hero.checkpoints is up-to-date before
@@ -783,6 +751,7 @@ export class LaneScene extends Phaser.Scene {
   }
 
   private showChoice(): void {
+    playSfx('choice');
     const s = this.engine.snapshot();
     const risk = s.haulCount > 0
       ? `unbanked +${s.runGold}◆  ·  🎒 ${s.haulCount} gear at risk`
@@ -945,7 +914,7 @@ export class LaneScene extends Phaser.Scene {
 
   private drawBars(): void {
     this.bars.clear();
-    this.bar(HERO_X, GROUND_Y - HERO_SPEC.displayH - 16, 96,
+    this.bar(HERO_X, GROUND_Y - this.heroSpec.displayH - 16, 96,
       this.snap.hero.hp / this.snap.hero.maxHp,
       this.snap.hero.shield / this.snap.hero.maxHp, 0x5bd06a);
     for (const m of this.snap.monsters) {
@@ -979,7 +948,7 @@ export class LaneScene extends Phaser.Scene {
    *  Shield is excluded — it renders as a segment on the HP bar. */
   private drawStatuses(): void {
     const list = this.snap.hero.statuses.filter((s) => s.id !== 'shield');
-    const y = GROUND_Y - HERO_SPEC.displayH - 44;
+    const y = GROUND_Y - this.heroSpec.displayH - 44;
     const shown = Math.min(list.length, this.heroStatusIcons.length);
     const totalW = shown * STATUS_ICON_GAP;
     const startX = HERO_X - totalW / 2 + STATUS_ICON_GAP / 2;
@@ -1100,6 +1069,60 @@ export class LaneScene extends Phaser.Scene {
     }
   }
 
+  // ---- character animation (ART_BIBLE §5) ------------------------------------
+
+  /** Register one Phaser animation per (animated spec × ANIM_ORDER entry) once
+   *  per scene. Specs whose texture failed to load are skipped, so a missing
+   *  PNG costs that actor its animation — never the whole lane. */
+  private registerAnims(): void {
+    for (const spec of ALL_CHAR_SPECS) {
+      if (!spec.sheet || !this.textures.exists(spec.key)) continue;
+      for (const id of ANIM_ORDER) {
+        const key = animKey(spec, id);
+        if (this.anims.exists(key)) continue;
+        const range = animRange(spec.sheet, id);
+        if (!range) continue; // this character has no such animation yet
+        const { start, end } = range;
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers(spec.key, { start, end }),
+          // Idle breathes slowly and loops; attack snaps once and hands back.
+          frameRate: id === 'idle' ? 6 : 14,
+          repeat: id === 'idle' ? -1 : 0,
+        });
+      }
+    }
+  }
+
+  /** True when this spec's animations actually registered (art regenerated as a
+   *  character AND the sheet loaded) — the switch between the animated path and
+   *  the legacy static-image + bob path. */
+  private isAnimated(spec: CharSpec): boolean {
+    return Boolean(spec.sheet) && this.anims.exists(animKey(spec, 'idle'));
+  }
+
+  /** Create a fighter's sprite at `x` standing on GROUND_Y: animated characters
+   *  start their idle loop, static ones get the old bob tween so they don't read
+   *  as frozen. */
+  private spawnActorSprite(spec: CharSpec, x: number, scale: number, bobDelayMs = 0): Phaser.GameObjects.Sprite {
+    const sprite = this.add
+      .sprite(x, GROUND_Y, spec.key)
+      .setOrigin(spec.originX, spec.originY)
+      .setScale(scale)
+      .setDepth(SPRITE_DEPTH);
+    if (this.isAnimated(spec)) sprite.play(animKey(spec, 'idle'));
+    else this.idleBob(sprite, bobDelayMs);
+    return sprite;
+  }
+
+  /** Play a one-shot animation (attack) and fall back to the idle loop when it
+   *  finishes. No-op for static art — the lunge tween still sells the swing. */
+  private playOneShot(sprite: Phaser.GameObjects.Sprite, spec: CharSpec, id: AnimId): void {
+    if (!this.isAnimated(spec) || !this.anims.exists(animKey(spec, id))) return;
+    sprite.play(animKey(spec, id), true);
+    sprite.chain(animKey(spec, 'idle'));
+  }
+
   private idleBob(target: Phaser.GameObjects.Image, delayMs: number): void {
     this.tweens.add({
       targets: target, y: target.y - 8, duration: 700, yoyo: true,
@@ -1107,16 +1130,29 @@ export class LaneScene extends Phaser.Scene {
     });
   }
 
-  private hitFx(attacker: Phaser.GameObjects.Image, dir: number): void {
+  /** Attack beat: play the attack animation and lunge toward the target. The
+   *  lunge stays for animated characters too — it carries the impact timing the
+   *  4-frame swing alone can't. */
+  private hitFx(attacker: Phaser.GameObjects.Sprite, spec: CharSpec, dir: number): void {
+    this.playOneShot(attacker, spec, 'attack');
     this.tweens.add({
       targets: attacker, x: attacker.x + dir * 24, duration: 90, yoyo: true, ease: 'Quad.out',
+    });
+  }
+
+  /** Hurt flash on the entity that just took damage — a short red tint pulse.
+   *  Elite/boss tints are restored afterwards so rarity stays readable. */
+  private hurtFx(sprite: Phaser.GameObjects.Sprite, restoreTint: number): void {
+    sprite.setTintFill(0xff8894);
+    this.time.delayedCall(70, () => {
+      if (sprite.active) sprite.setTint(restoreTint);
     });
   }
 
   /** Float text above an entity by id ('hero' or a pack member id). */
   private floatAt(entityId: string, label: string, color: string): void {
     if (entityId === 'hero') {
-      this.floatNumber(HERO_X, GROUND_Y - HERO_SPEC.displayH - 24, label, color);
+      this.floatNumber(HERO_X, GROUND_Y - this.heroSpec.displayH - 24, label, color);
       return;
     }
     const actor = this.actors.get(entityId);

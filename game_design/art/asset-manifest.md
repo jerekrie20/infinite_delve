@@ -79,7 +79,7 @@ jewelry — glint only). Phase 5.
 | Statuses ([[status-effects]]) | ✅ 16 (15 + empowered) | 1 — DONE 2026-07-23, `public/icons/` |
 | Elite/boss passive badges (D34: thorns, revive, execute…) | ✅ 11 | 1-2 — DONE 2026-07-23, `public/icons/` |
 | Consumables | 4 | 4 |
-| Abilities — option-1 column | 15 | 3 |
+| Abilities — option-1 column | ✅ 15 | 3 — DONE 2026-07-24, `public/icons/abilities/` |
 | Abilities — options 2-4 | 45 | with their content (3-5) |
 
 ## 5. Backgrounds & environment ([[ART_BIBLE]] §7)
@@ -137,6 +137,39 @@ Splash frontier scene (theme-accent variants) · boss-felled celebration
 card template · season finale card · mastery announcement card. Phase 8.
 
 ## Character ID ledger (extend on every accepted asset)
+
+### Phase 3 — animated CHARACTERS (`create_character` + `animate_character`)
+
+The Phase-3 pipeline (2026-07-24): `create_character` (view=side, 4 directions,
+size 96 → 136×136 output) then one `animate_character` call per animation,
+**single direction only** — heroes east, monsters west (ART_BIBLE §1: no runtime
+flipping), which is what makes this affordable (2 generations per animation
+instead of 8). Per character: 1 base + 2 idle + 2 attack = **5 generations**.
+Frames download as individual PNGs and are composited into ONE horizontal strip
+by `scratchpad/sheet.mjs`; origins come from the BASE POSE (frame 0), never the
+union across frames. Specs live in `src/client/game/charSpecs.ts` and are
+enforced against the PNGs by `tests/char-specs.test.ts`.
+
+**Prompt rule learned 2026-07-24 (important):** the grim-glow recipe alone
+produces HUMANS. The first Goblin Scout came back as a man with a ponytail. Every
+monster prompt must front-load **explicit creature anatomy** before the recipe —
+"mottled green skin, huge pointed ears, long crooked nose, wiry limbs, half the
+height of a man" — and vary build per kind so silhouettes differ at a glance.
+That fix produced an unmistakable goblin on the first retry.
+
+| Asset | PixelLab character ID | Dir | Anims (frames) | Origin (x,y) · nativeH | Strip |
+|-------|----------------------|-----|----------------|------------------------|-------|
+| hero_squire | `51fb8c06-d065-4db2-aa8b-780c2125fd2b` | east | idle 5 · attack 5 | 0.5404, 0.875 · 103 | `heroes/squire.png` |
+| goblin_scout | `c3918fbc-884a-45b1-bd42-3dc24cf3b6f9` | west | idle 5 · attack 5 | 0.4743, 0.875 · 96 | `monsters/goblin_scout.png` |
+| goblin_brute | `8cdf1ac6-aa4d-4d5c-9a5c-877f5b1f0d43` | west | idle 5 · attack 5 | 0.4963, 0.875 · 97 | `monsters/goblin_brute.png` |
+| goblin_shaman | `bac9bf05-8e27-4891-be8d-ce2ceb96cc0e` | west | idle 5 · attack 5 | 0.5257, 0.875 · 104 | `monsters/goblin_shaman.png` |
+| goblin_chief (BOSS) | `fbefb076-0c52-4099-8a02-4d6fba2e3bc0` | west | idle 5 · attack 5 · signature 5 | _pending_ | `monsters/goblin_chieftain.png` |
+
+Superseded: `e9308a32…` was the first (too-human) Goblin Scout — replaced by
+`c3918fbc…`. Bosses carry a third `signature` animation wired to the existing
+`bossWindUp` telegraph (D31/D39) — Chieftain's is **War Cry** per [[roster]].
+
+### Pre-Phase-3 static sprites (`create_map_object` — being replaced)
 
 | Asset | PixelLab ID | Origin (x,y 0..1) |
 |-------|------------|-------------------|

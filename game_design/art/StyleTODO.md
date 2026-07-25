@@ -75,7 +75,41 @@ slots on hudSlotTex, tab tints correct.
 - [ ] 🕓 Doors OPEN (frame anim) and the hero RUNS INTO them on descend/extract
 - [ ] 🕓 Tie into the existing `bossDoorTransition()` run-through
 
-## 5. Monsters must be CHARACTERS, not objects  🕓 later — IMPORTANT
+## 5. Monsters must be CHARACTERS, not objects  🚧 CURRENT (slice done 2026-07-24)
+
+✅ **VERTICAL SLICE LANDED 2026-07-24** — Squire (east) + Goblin Scout (west)
+regenerated as animated PixelLab characters with idle(5f) + attack(5f), and the
+renderer reworked from static `Image` + bob/hit tweens to real Phaser sprite-sheet
+animations. Proven in a composited preview: both fighters animate, face correctly,
+and their feet land exactly on `GROUND_Y` from the spec origins.
+
+What the slice changed in code:
+- **`src/client/game/charSpecs.ts` (new)** — all hero/monster `CharSpec` tables
+  moved out of LaneScene into a phaser-free module so tests can read them.
+  `CharSpec` gained `sheet?: AnimSheet` (frameSize + per-animation frame counts,
+  laid out back-to-back in `ANIM_ORDER`) and `file?` (defaults `monsters/<key>.png`).
+  `ALL_CHAR_SPECS` now drives preload AND animation registration — one deduped
+  list, so a regenerated monster is a ONE-SPEC edit with no parallel key list.
+- **LaneScene** — `registerAnims()` builds `<key>-idle`/`<key>-attack` per animated
+  spec; `spawnActorSprite()` plays the idle loop (animated) or keeps the bob tween
+  (static, not yet regenerated); `hitFx()` plays attack-on-beat + keeps the lunge;
+  new `hurtFx()` red flash on the damaged actor; death stops the anim then tweens.
+  Sprites are `Phaser.GameObjects.Sprite`; hero spec is per-class via `heroSpecFor`.
+- **`tests/char-specs.test.ts` (new, 10 checks)** — reads every PNG's IHDR and
+  asserts strip width == frameSize × declared frames, square static sprites,
+  contiguous in-range frame ranges, origin sanity, unique keys, class fallback.
+  Verified to FAIL on a miscounted spec (the silent-breakage guard).
+- **`scratchpad/sheet.mjs` (new)** — composites frame PNGs into a strip and
+  reports the base-pose origin. Round-trip verified pixel-exact vs `bbox.mjs`.
+
+**Mixed state is supported by design**: specs without `sheet` keep the old static
+path, so the remaining 23 monsters render exactly as before until regenerated.
+
+- [ ] ⬜ Remaining 19 templates + 6 bosses → characters (bosses add a signature pose)
+- [ ] ⬜ Archer + Apprentice hero characters (currently fall back to `spr_hero`)
+- [ ] ⬜ Capture per-frame anchor tables for the Phase-4 paper-doll (ART_BIBLE §5)
+
+### Original note (context)
 The 24 monsters + hero-theme sprites were made via `create_map_object` (static,
 auto-delete after 8h, **no animation support**). For the D26 animation matrix
 (idle/attack per monster) they must be PixelLab **characters** (`create_character`

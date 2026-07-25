@@ -1,0 +1,10 @@
+slam a5c3947e-beb8-4e8c-91cb-bfe5cbe2d3cb
+fortify f02459f7-775b-401d-8a49-d1d09231ee4f
+tauntingShout 5e8af6cf-6f01-4d41-9631-723d17011ae8
+whirlwind 0661408c-df3d-4927-876f-9ea3fb2b0600
+aegisOath beb5e750-b058-4c1b-bdcf-2afe1c70f82b
+piercingShot e3357dd3-e6a9-418c-84fb-9ef5ff6b413c
+tumble 79e7cf16-687a-4f73-951a-425c4f570653
+volley f49fbafb-df96-442b-95ae-d054396bf05c
+huntersMark 30cb2cbd-8034-44fa-bc6d-42b03c0c1553
+deadeye 3d2bfa63-174d-449c-b130-ef02ce6595c6

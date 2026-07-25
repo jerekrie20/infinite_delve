@@ -5,6 +5,13 @@ import { formatShort } from '../ui/format';
 import { openItemPopup } from '../ui/gear';
 import { ACTIVES } from '../../shared/content/actives';
 
+/** Texture key for an ability's grim-glow icon (D27). Namespaced away from the
+ *  status icons in LaneScene, whose ids overlap (both define 'fortify'). */
+const abilityIconKey = (abilityId: string): string => `ability-${abilityId}`;
+
+/** On-screen size of the ability art inside a skill slot. */
+const ABILITY_ICON_PX = 52;
+
 /** Live combat + hero state the HUD paints from. LaneScene emits this shape on
  *  the 'hud-changed' game event; the HUD only reads it — cooldowns and hits
  *  come straight from the engine snapshot (single source of truth). */
@@ -101,6 +108,9 @@ export class HudScene extends Phaser.Scene {
     mana: Phaser.GameObjects.Text;
     cdOverlay: Phaser.GameObjects.Graphics;
     priority?: Phaser.GameObjects.Text;
+    /** Grim-glow ability art (D27). Present once the icon PNG exists; the
+     *  `icon` Text stays as the emoji fallback AND the cooldown countdown. */
+    art?: Phaser.GameObjects.Image | undefined;
   }> = [];
   /** Engine cooldowns mirrored from the latest hud-changed snapshot. */
   private cooldowns: Record<string, number> = {};
@@ -121,6 +131,14 @@ export class HudScene extends Phaser.Scene {
   preload(): void {
     this.load.atlas('ui', 'ui-sheet.png', 'ui-sheet.json');
     this.load.json('uimap', 'ui-map.json');
+    // Ability icons (D27, 64px grim-glow): one texture per ACTIVES row, keyed
+    // `ability-<id>`. They live in icons/abilities/ because ability ids collide
+    // with status ids (both have a 'fortify'). A missing file just leaves the
+    // emoji fallback in place — `loaderror` is swallowed so the HUD still builds.
+    this.load.on('loaderror', () => undefined);
+    for (const id of Object.keys(ACTIVES)) {
+      this.load.image(abilityIconKey(id), `icons/abilities/${id}.png`);
+    }
   }
 
   create(): void {
@@ -193,6 +211,15 @@ export class HudScene extends Phaser.Scene {
     const f = t.frame ? this.textures.getFrame(t.texture, t.frame) : this.textures.getFrame(t.texture);
     if (f) img.setScale(Math.min(box / f.width, box / f.height));
     return img;
+  }
+
+  /** The ability's icon art, or null when that PNG hasn't been generated yet
+   *  (the caller then keeps the emoji Text visible). */
+  private abilityArt(abilityId: string | null, cx: number, cy: number): Phaser.GameObjects.Image | undefined {
+    if (!abilityId) return undefined;
+    const key = abilityIconKey(abilityId);
+    if (!this.textures.exists(key)) return undefined;
+    return this.add.image(cx, cy, key).setDisplaySize(ABILITY_ICON_PX, ABILITY_ICON_PX);
   }
 
   private fillColor(key: string, fallback = 0x888888): number {
@@ -285,15 +312,19 @@ export class HudScene extends Phaser.Scene {
       if (def && def.basic) {
         // Basic attack style: informational, fires on the attack timer.
         const icon = this.label(cx, 1088, def.icon, 30, '#ffffff', 'center');
+        const art = this.abilityArt(abilityId, cx, 1088);
+        if (art) { icon.setVisible(false); this.skillsView.add(art); }
         const label = this.label(cx, 1136, def.name, 16, '#d0c8e8', 'center');
         const mana = this.label(cx, 1152, 'auto', 14, '#9d8fc0', 'center');
         this.skillsView.add(icon);
         this.skillsView.add(label);
         this.skillsView.add(mana);
-        this.skillSlots.push({ bg, icon, label, mana, cdOverlay: cdGfx });
+        this.skillSlots.push({ bg, icon, label, mana, cdOverlay: cdGfx, art });
       } else if (def) {
         // Rotation ability button
         const icon = this.label(cx, 1088, def.icon, 30, '#ffffff', 'center');
+        const art = this.abilityArt(abilityId, cx, 1088);
+        if (art) { icon.setVisible(false); this.skillsView.add(art); }
         const label = this.label(cx, 1136, def.name, 16, '#d0c8e8', 'center');
         const mana = this.label(cx, 1152, `${def.manaCost}◆`, 14, '#4aa3ff', 'center');
         this.skillsView.add(icon);
@@ -306,7 +337,7 @@ export class HudScene extends Phaser.Scene {
         const up = this.label(cx + size / 2 - 14, 1104 - size / 2 + 14, '▲', 18, '#c9b8ff', 'center');
         up.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.promoteInRotation(abilityId!));
         this.skillsView.add(up);
-        this.skillSlots.push({ bg, icon, label, mana, cdOverlay: cdGfx, priority });
+        this.skillSlots.push({ bg, icon, label, mana, cdOverlay: cdGfx, priority, art });
       } else {
         // Locked placeholder
         const lock = this.label(cx, 1104, '🔒', 26, '#6f6690', 'center');
@@ -452,11 +483,19 @@ export class HudScene extends Phaser.Scene {
         // Dark overlay + remaining seconds text
         g.fillStyle(0x000000, 0.55);
         g.fillRoundedRect(cx - size / 2, 1104 - size / 2, size, size, 12);
-        // We draw the text via the existing label (reuse icon text for cd display)
+        // The countdown reuses the icon Text slot, so the art (when present)
+        // steps aside for it and comes back when the ability is ready.
+        slot.art?.setVisible(false);
+        slot.icon.setVisible(true);
         slot.icon.setText(Math.ceil(cd / 1000).toString());
         slot.icon.setFontSize(22).setColor('#ffb020');
       } else if (def) {
-        slot.icon.setText(def.icon).setFontSize(30).setColor('#ffffff');
+        if (slot.art) {
+          slot.art.setVisible(true);
+          slot.icon.setVisible(false);
+        } else {
+          slot.icon.setText(def.icon).setFontSize(30).setColor('#ffffff');
+        }
         // Dim if insufficient mana
         if (this.hero.mana < def.manaCost) {
           g.fillStyle(0x000000, 0.3);

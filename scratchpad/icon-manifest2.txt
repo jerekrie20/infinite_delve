@@ -1,0 +1,3 @@
+fireBolt 8d1bc18d-c573-43a7-aade-3154cfe98d42
+manaShield fab10ea3-98cf-4ab5-b842-54caec2e0393
+iceNova 04f0ef75-752f-4bf0-bd64-36461f09099e
